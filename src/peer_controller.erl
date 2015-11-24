@@ -6,7 +6,7 @@
 
 %% API
 -export([ local_connect/0
-        , remote_connect/0
+        , remote_connect/1
         , recv_incoming_packet/3
         ]).
 
@@ -21,7 +21,6 @@
 
 %% gen_fsm state functions
 -export([ connecting/2
-        , acknowledging_connect/2
         , acknowledging_verify_connect/2
         , verifying_connect/2
         , connected/2
@@ -31,20 +30,25 @@
         { host
         }).
 
+
 %%==============================================================
-%% Connection procedure
+%% Connection handshake
 %%==============================================================
 %%
 %%
 %%      state    client              server     state
-%%                 |                    |
+%%              new peer            null peer
+%%                 *                    |
 %%          (init) |       connect      |
 %%                 |------------------->|
-%%    'connecting' |                    | 'acknowledging connect'
+%%    'connecting' |                    |
 %%                 |     ack connect    |
 %%                 |<-------------------|
 %%  'acknowledging |                    |
-%% verify connect' |   verify connect   |
+%% verify connect' |
+%%                 |                 new peer
+%%                 |                    *
+%%                 |   verify connect   | (init)
 %%                 |<-------------------|
 %%                 |                    | 'verifying connect'
 %%                 | ack verify connect |
@@ -63,8 +67,8 @@
 local_connect() ->
     gen_fsm:start_link(?MODULE, [local], []).
 
-remote_connect() ->
-    gen_fsm:start_link(?MODULE, [remote], []).
+remote_connect(ConnectCommand) ->
+    gen_fsm:start_link(?MODULE, [remote, ConnectCommand], []).
 
 recv_incoming_packet(Peer, SentTime, Packet) ->
     gen_fsm:send_all_state_event(Peer, {incoming_packet, SentTime, Packet}).
@@ -75,12 +79,23 @@ recv_incoming_packet(Peer, SentTime, Packet) ->
 %%%===================================================================
 
 init([local]) ->
-    %% TODO: Set up connection with host controller
+    %%
+    %% The client application wants to connect to a remote peer.
+    %%
+    %% - Send a Connect command to the remote peer (TODO)
+    %% - Start in the 'connecting' state
+    %%
     {ok, connecting, #state{}};
 
-init([remote]) ->
-    %% TODO: Notify client (probably at end of connect procedure)
-    {ok, acknowledging_connect, #state{}}.
+init([remote, _C = #connect{}]) ->
+    %%
+    %% Received a Connect command from a (new) remote peer.
+    %% The Null Peer has acknowledged this command.
+    %%
+    %% - Send a VerifyConnect command (TODO)
+    %% - Start in the 'verifying_connect' state
+    %%
+    {ok, verifying_connect, #state{}}.
 
 
 %%%
@@ -98,24 +113,6 @@ connecting({incoming_command, _SentTime, {_H, _C = #acknowledge{}}}, S) ->
 
 connecting(_Event, State) ->
     {next_state, connecting, State}.
-
-
-%%%
-%%% Acknowledging Connect state
-%%%
-
-acknowledging_connect({incoming_command, SentTime, {_H, _C = #connect{}}}, S) ->
-    %%
-    %% Received the Connect command in the 'acknowledging_connect' state.
-    %%
-    %% - Acknowledge the Connect command (TODO)
-    %% - Send a VerifyConnect command (TODO)
-    %% - Change to 'verifying_connect' state
-    %%
-    {next_state, verifying_connect, S};
-
-acknowledging_connect(_Event, State) ->
-    {next_state, connected, State}.
 
 
 %%%
@@ -145,7 +142,7 @@ acknowledging_verify_connect(_Event, State) ->
 %%% Verifying Connect state
 %%%
 
-verifying_connect({incoming_command, SentTime, {_H, _C = #acknowledge{}}}, S) ->
+verifying_connect({incoming_command, _SentTime, {_H, _C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command in the 'verifying_connect' state.
     %%

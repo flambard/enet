@@ -19,10 +19,14 @@
 
 -record(state,
         { socket
+        , null_peer
         , peers
         , compress_fun
         , decompress_fun
         }).
+
+-define(NULL_PEER_ID, 16#FFF).
+
 
 %%%===================================================================
 %%% API
@@ -40,12 +44,14 @@ send_outgoing_commands(Host, Commands) ->
 %%%===================================================================
 
 init([Port]) ->
+    {ok, NullPeer} = null_peer:start_link(),
     SocketOptions = [ binary
                     , {active, true}
                     ],
     {ok, Socket} = gen_udp:open(Port, SocketOptions),
     {ok, #state{
             socket = Socket,
+            null_peer = NullPeer,
             peers = maps:new()
            }}.
 
@@ -98,8 +104,7 @@ handle_info({udp, Socket, _IP, _InPortNo, Packet},
     %%
     %% - Unpack the ENet protocol header
     %% - Decompress the remaining packet if necessary
-    %% - Unpack the ENet commands (No, should be done by the peer)
-    %% - Send the commands to the peer (ID in protocol header)
+    %% - Send the packet to the peer (ID in protocol header)
     %%
     {ok, PH, Rest} = wire_protocol_decode:protocol_header(Packet),
     Commands =
@@ -108,9 +113,17 @@ handle_info({udp, Socket, _IP, _InPortNo, Packet},
             1 -> Decompress = S#state.decompress_fun,
                  Decompress(Rest)
         end,
-    {ok, Peer} = maps:find(PH#protocol_header.peer_id, S#state.peers),
     SentTime = PH#protocol_header.sent_time,
-    ok = peer_controller:recv_incoming_packet(Peer, SentTime, Commands),
+    case PH#protocol_header.peer_id of
+        ?NULL_PEER_ID ->
+            %% No particular peer is the receiver of this packet.
+            %% Send it to the "null peer".
+            Peer = S#state.null_peer,
+            ok = null_peer:recv_incoming_packet(Peer, SentTime, Commands);
+        PeerID ->
+            {ok, Peer} = maps:find(PeerID, S#state.peers),
+            ok = peer_controller:recv_incoming_packet(Peer, SentTime, Commands)
+    end,
     {noreply, S};
 
 handle_info(_Info, State) ->
