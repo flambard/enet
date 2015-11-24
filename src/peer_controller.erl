@@ -132,19 +132,7 @@ acknowledging_verify_connect(
     %% - Acknowledge the command
     %% - Change state to 'connected'
     %%
-    ReliableSequenceNumber = H#command_header.reliable_sequence_number,
-    AckHeader = #command_header{
-                   command = ?COMMAND_ACKNOWLEDGE,
-                   channel_id = 0,
-                   reliable_sequence_number = 0
-                  },
-    Ack = #acknowledge{
-             received_reliable_sequence_number = ReliableSequenceNumber,
-             received_sent_time = SentTime
-            },
-    HeaderBin = wire_protocol_encode:command_header(AckHeader),
-    CommandBin = wire_protocol_encode:command(Ack),
-    Packet = [HeaderBin, CommandBin],
+    Packet = protocol:make_acknowledge_packet(H, SentTime),
     {sent_time, _AckSentTime} =
         host_controller:send_outgoing_commands(S#state.host, Packet),
     {next_state, connected, S};
