@@ -5,8 +5,8 @@
 -include("protocol.hrl").
 
 %% API
--export([ local_connect/0
-        , remote_connect/1
+-export([ local_connect/1
+        , remote_connect/2
         , recv_incoming_packet/3
         ]).
 
@@ -64,11 +64,11 @@
 %%% API
 %%%===================================================================
 
-local_connect() ->
-    gen_fsm:start_link(?MODULE, [local], []).
+local_connect(Host) ->
+    gen_fsm:start(?MODULE, {local_connect, Host}, []).
 
-remote_connect(ConnectCommand) ->
-    gen_fsm:start_link(?MODULE, [remote, ConnectCommand], []).
+remote_connect(Host, ConnectCommand) ->
+    gen_fsm:start(?MODULE, {remote_connect, Host, ConnectCommand}, []).
 
 recv_incoming_packet(Peer, SentTime, Packet) ->
     gen_fsm:send_all_state_event(Peer, {incoming_packet, SentTime, Packet}).
@@ -78,23 +78,27 @@ recv_incoming_packet(Peer, SentTime, Packet) ->
 %%% gen_fsm callbacks
 %%%===================================================================
 
-init([local]) ->
+init({local_connect, Host}) ->
     %%
     %% The client application wants to connect to a remote peer.
     %%
-    %% - Send a Connect command to the remote peer (TODO)
+    %% - Establish a connection with the host (returns peer ID)
+    %% - Send a Connect command to the remote peer (use peer ID) (TODO)
     %% - Start in the 'connecting' state
     %%
+    {peer_id, PeerID} = host_controller:link_peer_controller(Host),
     {ok, connecting, #state{}};
 
-init([remote, _C = #connect{}]) ->
+init({remote_connect, Host, _C = #connect{}}) ->
     %%
     %% Received a Connect command from a (new) remote peer.
     %% The Null Peer has acknowledged this command.
     %%
-    %% - Send a VerifyConnect command (TODO)
+    %% - Establish a connection with the host (returns peer ID) (TODO)
+    %% - Send a VerifyConnect command (use peer ID) (TODO)
     %% - Start in the 'verifying_connect' state
     %%
+    {peer_id, PeerID} = host_controller:link_peer_controller(Host),
     {ok, verifying_connect, #state{}}.
 
 

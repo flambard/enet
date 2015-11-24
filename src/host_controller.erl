@@ -5,6 +5,7 @@
 
 %% API
 -export([ start_link/1
+        , link_peer_controller/1
         , send_outgoing_commands/2
         ]).
 
@@ -35,6 +36,9 @@
 start_link(Port) ->
     gen_server:start_link(?MODULE, [Port], []).
 
+link_peer_controller(Host) ->
+    gen_server:call(Host, link_peer_controller).
+
 send_outgoing_commands(Host, Commands) ->
     gen_server:call(Host, {send_outgoing_commands, Commands}).
 
@@ -55,6 +59,20 @@ init([Port]) ->
             peers = maps:new()
            }}.
 
+
+handle_call(link_peer_controller, {Peer, _}, S) ->
+    %%
+    %% A new Peer Controller wants to register with the Host Controller.
+    %%
+    %% - Create a link between the processes
+    %% - Select a free peer ID to use (TODO)
+    %% - Add the peer controller to the registry
+    %% - Return the new peer ID
+    %%
+    true = link(Peer),
+    PeerID = undefined,
+    PeerMap = maps:put(PeerID, Peer, S#state.peers),
+    {reply, {peer_id, PeerID}, S#state{ peers = PeerMap }};
 
 handle_call({send_outgoing_commands, Commands}, {Peer, _}, S) ->
     %%

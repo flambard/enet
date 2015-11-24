@@ -86,7 +86,7 @@ handle_cast({incoming_packet, SentTime, Packet}, S) ->
       Commands),
     {noreply, S};
 
-handle_cast({incoming_command, SentTime, {H, _C = #connect{}}}, S) ->
+handle_cast({incoming_command, SentTime, {H, C = #connect{}}}, S) ->
     %%
     %% Received an Connect command.
     %%
@@ -97,6 +97,7 @@ handle_cast({incoming_command, SentTime, {H, _C = #connect{}}}, S) ->
     Packet = protocol:make_acknowledge_packet(H, SentTime),
     {sent_time, _AckSentTime} =
         host_controller:send_outgoing_commands(S#state.host, Packet),
+    ok = peer_controller:remote_connect(S#state.host, C),
     {noreply, S};
 
 handle_cast(_Msg, State) ->
