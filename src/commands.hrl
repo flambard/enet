@@ -34,7 +34,7 @@
 -define(PEER_PACKET_THROTTLE_INTERVAL     , 5000).
 -define(PEER_PACKET_LOSS_SCALE            , (1 bsl 16)).
 -define(PEER_PACKET_LOSS_INTERVAL         , 10000).
--define(PEER_WINDOW_SIZE_SCALE            , 64 * 1024).
+-define(PEER_WINDOW_SIZE_SCALE            , (64 * 1024)).
 -define(PEER_TIMEOUT_LIMIT                , 32).
 -define(PEER_TIMEOUT_MINIMUM              , 5000).
 -define(PEER_TIMEOUT_MAXIMUM              , 30000).

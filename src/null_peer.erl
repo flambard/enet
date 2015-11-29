@@ -6,7 +6,7 @@
 
 %% API
 -export([ start_link/0
-        , recv_incoming_packet/3
+        , recv_incoming_packet/5
         ]).
 
 %% gen_server callbacks
@@ -28,18 +28,18 @@
 %%%===================================================================
 
 start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+    gen_server:start_link(?MODULE, [self()], []).
 
-recv_incoming_packet(Peer, SentTime, Packet) ->
-    gen_server:cast(Peer, {incoming_packet, SentTime, Packet}).
+recv_incoming_packet(Peer, SentTime, Packet, IP, Port) ->
+    gen_server:cast(Peer, {incoming_packet, SentTime, Packet, IP, Port}).
 
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
-init([]) ->
-    {ok, #state{}}.
+init([Host]) ->
+    {ok, #state{ host = Host }}.
 
 
 %%--------------------------------------------------------------------
@@ -71,7 +71,7 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({incoming_packet, SentTime, Packet}, S) ->
+handle_cast({incoming_packet, SentTime, Packet, IP, Port}, S) ->
     %%
     %% Received an incoming packet of commands.
     %%
@@ -81,23 +81,26 @@ handle_cast({incoming_packet, SentTime, Packet}, S) ->
     {ok, Commands} = wire_protocol_decode:commands(Packet),
     lists:foreach(
       fun (C) ->
-              gen_server:cast(self(), {incoming_command, SentTime, C})
+              gen_server:cast(self(), {incoming_command, SentTime, C, IP, Port})
       end,
       Commands),
     {noreply, S};
 
-handle_cast({incoming_command, SentTime, {H, C = #connect{}}}, S) ->
+handle_cast({incoming_command, SentTime, {H, C = #connect{}}, IP, Port}, S) ->
     %%
-    %% Received an Connect command.
+    %% Received a Connect command.
     %%
     %% - Verify that the data is sane (TODO)
     %% - Acknowledge the command
-    %% - Start a new peer controller and pass in the data from the command (TODO)
+    %% - Start a new peer controller and pass in the data from the command
     %%
-    Packet = protocol:make_acknowledge_packet(H, SentTime),
+    {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
+    HBin = wire_protocol_encode:command_header(AckH),
+    CBin = wire_protocol_encode:command(AckC),
     {sent_time, _AckSentTime} =
-        host_controller:send_outgoing_commands(S#state.host, Packet),
-    ok = peer_controller:remote_connect(S#state.host, C),
+        host_controller:send_outgoing_commands(
+          S#state.host, [HBin, CBin], IP, Port, C#connect.outgoing_peer_id),
+    peer_controller:remote_connect(S#state.host, C, IP, Port),
     {noreply, S};
 
 handle_cast(_Msg, State) ->

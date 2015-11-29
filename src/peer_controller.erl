@@ -1,12 +1,13 @@
 -module(peer_controller).
 -behaviour(gen_fsm).
 
+-include("peer_info.hrl").
 -include("commands.hrl").
 -include("protocol.hrl").
 
 %% API
--export([ local_connect/1
-        , remote_connect/2
+-export([ local_connect/3
+        , remote_connect/4
         , recv_incoming_packet/3
         ]).
 
@@ -28,6 +29,10 @@
 
 -record(state,
         { host
+        , host_data
+        , packet_throttle_interval = ?PEER_PACKET_THROTTLE_INTERVAL
+        , packet_throttle_acceleration = ?PEER_PACKET_THROTTLE_ACCELERATION
+        , packet_throttle_deceleration = ?PEER_PACKET_THROTTLE_DECELERATION
         }).
 
 
@@ -44,7 +49,7 @@
 %%    'connecting' |                    |
 %%                 |     ack connect    |
 %%                 |<-------------------|
-%%  'acknowledging |                    |
+%%  'acknowledging |                    | (create new peer)
 %% verify connect' |
 %%                 |                 new peer
 %%                 |                    *
@@ -64,11 +69,11 @@
 %%% API
 %%%===================================================================
 
-local_connect(Host) ->
-    gen_fsm:start(?MODULE, {local_connect, Host}, []).
+local_connect(Host, IP, Port) ->
+    gen_fsm:start(?MODULE, {local_connect, Host, IP, Port}, []).
 
-remote_connect(Host, ConnectCommand) ->
-    gen_fsm:start(?MODULE, {remote_connect, Host, ConnectCommand}, []).
+remote_connect(Host, ConnectCmd, IP, Port) ->
+    gen_fsm:start(?MODULE, {remote_connect, Host, ConnectCmd, IP, Port}, []).
 
 recv_incoming_packet(Peer, SentTime, Packet) ->
     gen_fsm:send_all_state_event(Peer, {incoming_packet, SentTime, Packet}).
@@ -78,28 +83,62 @@ recv_incoming_packet(Peer, SentTime, Packet) ->
 %%% gen_fsm callbacks
 %%%===================================================================
 
-init({local_connect, Host}) ->
+init({local_connect, Host, IP, Port}) ->
     %%
     %% The client application wants to connect to a remote peer.
     %%
     %% - Establish a connection with the host (returns peer ID)
-    %% - Send a Connect command to the remote peer (use peer ID) (TODO)
+    %% - Send a Connect command to the remote peer (use peer ID)
     %% - Start in the 'connecting' state
     %%
-    {peer_id, PeerID} = host_controller:link_peer_controller(Host),
-    {ok, connecting, #state{}};
+    case host_controller:register_peer_controller(Host, IP, Port) of
+        {error, reached_peer_limit}   -> {stop, reached_peer_limit};
+        {ok, PeerInfo = #peer_info{}} ->
+            S = #state{ host = Host
+                      , host_data = PeerInfo#peer_info.host_data
+                      },
+            <<ConnectID:32>> = crypto:rand_bytes(4),
+            {ConnectH, ConnectC} =
+                protocol:make_connect_command(
+                  PeerInfo,
+                  S#state.packet_throttle_interval,
+                  S#state.packet_throttle_acceleration,
+                  S#state.packet_throttle_deceleration,
+                  ConnectID),
+            HBin = wire_protocol_encode:command_header(ConnectH),
+            CBin = wire_protocol_encode:command(ConnectC),
+            Packet = [HBin, CBin],
+            {sent_time, ConnectSentTime} =
+                host_controller:send_outgoing_commands(Host, Packet, IP, Port),
+            {ok, connecting, S}
+    end;
 
-init({remote_connect, Host, _C = #connect{}}) ->
+init({remote_connect, Host, C = #connect{}, IP, Port}) ->
     %%
     %% Received a Connect command from a (new) remote peer.
     %% The Null Peer has acknowledged this command.
     %%
-    %% - Establish a connection with the host (returns peer ID) (TODO)
-    %% - Send a VerifyConnect command (use peer ID) (TODO)
+    %% - Establish a connection with the host (returns peer ID)
+    %% - Send the prepared Acknowledge packet
+    %% - Send a VerifyConnect command (use peer ID)
     %% - Start in the 'verifying_connect' state
     %%
-    {peer_id, PeerID} = host_controller:link_peer_controller(Host),
-    {ok, verifying_connect, #state{}}.
+    RemoteID = C#connect.outgoing_peer_id,
+    case host_controller:register_peer_controller(Host, IP, Port, RemoteID) of
+        {error, reached_peer_limit}   -> {stop, reached_peer_limit};
+        {ok, PeerInfo = #peer_info{}} ->
+            %% {sent_time, _AckSentTime} =
+            %%     host_controller:send_outgoing_commands(Host, AckPacket),
+            S = #state{ host = Host
+                      , host_data = PeerInfo#peer_info.host_data
+                      },
+            {VCH, VCC} = protocol:make_verify_connect_command(C, PeerInfo),
+            HBin = wire_protocol_encode:command_header(VCH),
+            CBin = wire_protocol_encode:command(VCC),
+            {sent_time, VerifyConnectSentTime} =
+                host_controller:send_outgoing_commands(Host, [HBin, CBin]),
+            {ok, verifying_connect, S}
+    end.
 
 
 %%%
@@ -124,18 +163,24 @@ connecting(_Event, State) ->
 %%%
 
 acknowledging_verify_connect(
-  {incoming_command, SentTime, {H, _C = #verify_connect{}}}, S) ->
+  {incoming_command, SentTime, {H, C = #verify_connect{}}}, S) ->
     %%
     %% Received a Verify Connect command in the 'acknowledging_verify_connect'
     %% state.
     %%
     %% - Verify that the data is correct (TODO)
+    %% - Add the remote peer ID to the Peer Table (TODO)
     %% - Acknowledge the command
     %% - Change state to 'connected'
     %%
-    Packet = protocol:make_acknowledge_packet(H, SentTime),
+    Host = S#state.host,
+    RemotePeerID = C#verify_connect.outgoing_peer_id,
+    ok = host_controller:set_remote_peer_id(Host, RemotePeerID),
+    {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
+    HBin = wire_protocol_encode:command_header(AckH),
+    CBin = wire_protocol_encode:command(AckC),
     {sent_time, _AckSentTime} =
-        host_controller:send_outgoing_commands(S#state.host, Packet),
+        host_controller:send_outgoing_commands(Host, [HBin, CBin]),
     {next_state, connected, S};
 
 acknowledging_verify_connect(_Event, State) ->

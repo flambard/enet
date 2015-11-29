@@ -22,7 +22,7 @@ protocol_header(?PROTOCOL_HEADER(Compressed, 0, SessionID, PeerID, Commands)) ->
     {ok, Header, Commands};
 
 protocol_header(?PROTOCOL_HEADER(Compressed, 1, SessionID, PeerID, Rest)) ->
-    {SentTime, Commands} = split_binary(Rest, 2),
+    <<SentTime:16, Commands/binary>> = Rest,
     Header = #protocol_header{
                 compressed = Compressed,
                 session_id = SessionID,
@@ -136,7 +136,7 @@ command(?COMMAND_PING,
 
 command(?COMMAND_SEND_RELIABLE,
         ?SEND_RELIABLE(DataLength, DataRest)) ->
-    {Data, Rest} = split_binary(DataRest, DataLength),
+    <<Data:DataLength/binary, Rest/binary>> = DataRest,
     Command =
         #send_reliable{
            data = Data
@@ -145,7 +145,7 @@ command(?COMMAND_SEND_RELIABLE,
 
 command(?COMMAND_SEND_UNRELIABLE,
         ?SEND_UNRELIABLE(UnreliableSequenceNumber, DataLength, DataRest)) ->
-    {Data, Rest} = split_binary(DataRest, DataLength),
+    <<Data:DataLength/binary, Rest/binary>> = DataRest,
     Command =
         #send_unreliable{
            unreliable_sequence_number = UnreliableSequenceNumber,
@@ -155,7 +155,7 @@ command(?COMMAND_SEND_UNRELIABLE,
 
 command(?COMMAND_SEND_UNSEQUENCED,
         ?SEND_UNSEQUENCED(UnsequencedGroup, DataLength, DataRest)) ->
-    {Data, Rest} = split_binary(DataRest, DataLength),
+    <<Data:DataLength/binary, Rest/binary>> = DataRest,
     Command =
         #send_unsequenced{
            unsequenced_group = UnsequencedGroup,
@@ -167,7 +167,7 @@ command(?COMMAND_SEND_FRAGMENT,
         ?SEND_FRAGMENT(
            StartSequenceNumber, DataLength, FragmentCount, FragmentNumber,
            TotalLength, FragmentOffset, DataRest)) ->
-    {Data, Rest} = split_binary(DataRest, DataLength),
+    <<Data:DataLength/binary, Rest/binary>> = DataRest,
     Command =
         #send_fragment{
            start_sequence_number = StartSequenceNumber,

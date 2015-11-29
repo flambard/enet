@@ -1,12 +1,18 @@
 -module(host_controller).
 -behaviour(gen_server).
 
+-include("peer.hrl").
+-include("peer_info.hrl").
 -include("commands.hrl").
 
 %% API
--export([ start_link/1
-        , link_peer_controller/1
+-export([ start_link/2
+        , register_peer_controller/3
+        , register_peer_controller/4
+        , set_remote_peer_id/2
         , send_outgoing_commands/2
+        , send_outgoing_commands/4
+        , send_outgoing_commands/5
         ]).
 
 %% gen_server callbacks
@@ -21,7 +27,8 @@
 -record(state,
         { socket
         , null_peer
-        , peers
+        , peer_table
+        , data
         , compress_fun
         , decompress_fun
         }).
@@ -33,21 +40,35 @@
 %%% API
 %%%===================================================================
 
-start_link(Port) ->
-    gen_server:start_link(?MODULE, [Port], []).
+start_link(Port, PeerLimit) ->
+    gen_server:start_link(?MODULE, {Port, PeerLimit}, []).
 
-link_peer_controller(Host) ->
-    gen_server:call(Host, link_peer_controller).
+register_peer_controller(Host, Address, Port) ->
+    register_peer_controller(Host, Address, Port, undefined).
+
+register_peer_controller(Host, Address, Port, PeerID) ->
+    gen_server:call(Host, {register_peer_controller, Address, Port, PeerID}).
+
+set_remote_peer_id(Host, RemotePeerID) ->
+    gen_server:call(Host, {set_remote_peer_id, RemotePeerID}).
 
 send_outgoing_commands(Host, Commands) ->
     gen_server:call(Host, {send_outgoing_commands, Commands}).
+
+send_outgoing_commands(Host, Commands, Address, Port) ->
+    send_outgoing_commands(Host, Commands, Address, Port, ?NULL_PEER_ID).
+
+send_outgoing_commands(Host, Commands, Address, Port, PeerID) ->
+    gen_server:call(Host,
+                    {send_outgoing_commands, Commands, Address, Port, PeerID}).
 
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
-init([Port]) ->
+init({Port, PeerLimit}) ->
+    {ok, HostData} = host_data:make(),
     {ok, NullPeer} = null_peer:start_link(),
     SocketOptions = [ binary
                     , {active, true}
@@ -56,25 +77,41 @@ init([Port]) ->
     {ok, #state{
             socket = Socket,
             null_peer = NullPeer,
-            peers = maps:new()
+            peer_table = peer_table:new(PeerLimit),
+            data = HostData
            }}.
 
 
-handle_call(link_peer_controller, {Peer, _}, S) ->
+handle_call({register_peer_controller, Address, Port, ID} , {PeerPid, _}, S) ->
     %%
     %% A new Peer Controller wants to register with the Host Controller.
     %%
     %% - Create a link between the processes
-    %% - Select a free peer ID to use (TODO)
     %% - Add the peer controller to the registry
-    %% - Return the new peer ID
+    %% - Return a peer_info record with peer ID, session IDs, and a reference
+    %%   to the Host Data table
     %%
-    true = link(Peer),
-    PeerID = undefined,
-    PeerMap = maps:put(PeerID, Peer, S#state.peers),
-    {reply, {peer_id, PeerID}, S#state{ peers = PeerMap }};
+    link(PeerPid),
+    PeerTable = S#state.peer_table,
+    Reply =
+        case peer_table:insert(PeerTable, PeerPid, Address, Port, ID) of
+            {error, table_full} -> {error, reached_peer_limit};
+            {ok, PeerInfo}      ->
+                {ok, PeerInfo#peer_info{ host_data = S#state.data }}
+        end,
+    {reply, Reply, S};
 
-handle_call({send_outgoing_commands, Commands}, {Peer, _}, S) ->
+handle_call({set_remote_peer_id, PeerID} , {PeerPid, _}, S) ->
+    %%
+    %% A Peer Controller wants to set its remote peer ID.
+    %%
+    %% - Update the Peer Table
+    %% - Return 'ok'
+    %%
+    peer_table:set_remote_peer_id(S#state.peer_table, PeerPid, PeerID),
+    {reply, ok, S};
+
+handle_call({send_outgoing_commands, Commands}, {PeerPid, _}, S) ->
     %%
     %% Received outgoing commands from a peer.
     %%
@@ -83,18 +120,37 @@ handle_call({send_outgoing_commands, Commands}, {Peer, _}, S) ->
     %% - Send the packet
     %% - Return sent time
     %%
-    SentTime = undefined,
-    PeerID = undefined, %% Determine from Peer
+    #peer{ remote_id = PeerID
+         , address = Address
+         , port = Port
+         } = peer_table:lookup_by_pid(S#state.peer_table, PeerPid),
+    SentTime = 0, %% TODO
     PH = #protocol_header{
             peer_id = PeerID,
             sent_time = SentTime
            },
     Packet = [wire_protocol_encode:protocol_header(PH), Commands],
-    Socket = S#state.socket,
-    Address = undefined, %% Determine from Peer
-    Port = undefined, %% Determine from Peer
-    ok = gen_udp:send(Socket, Address, Port, Packet),
+    ok = gen_udp:send(S#state.socket, Address, Port, Packet),
     {reply, {sent_time, SentTime}, S};
+
+handle_call({send_outgoing_commands, Commands, Address, Port, ID}, _From, S) ->
+    %%
+    %% Received outgoing commands from a peer.
+    %%
+    %% - Compress commands if compressor available (TODO)
+    %% - Wrap the commands in a protocol header
+    %% - Send the packet
+    %% - Return sent time
+    %%
+    SentTime = 0, %% TODO
+    PH = #protocol_header{
+            peer_id = ID,
+            sent_time = SentTime
+           },
+    Packet = [wire_protocol_encode:protocol_header(PH), Commands],
+    ok = gen_udp:send(S#state.socket, Address, Port, Packet),
+    {reply, {sent_time, SentTime}, S};
+
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -115,7 +171,7 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 
-handle_info({udp, Socket, _IP, _InPortNo, Packet},
+handle_info({udp, Socket, IP, Port, Packet},
             S = #state{ socket = Socket }) ->
     %%
     %% Received a UDP packet.
@@ -136,10 +192,11 @@ handle_info({udp, Socket, _IP, _InPortNo, Packet},
         ?NULL_PEER_ID ->
             %% No particular peer is the receiver of this packet.
             %% Send it to the "null peer".
-            Peer = S#state.null_peer,
-            ok = null_peer:recv_incoming_packet(Peer, SentTime, Commands);
+            ok = null_peer:recv_incoming_packet(
+                   S#state.null_peer, SentTime, Commands, IP, Port);
         PeerID ->
-            {ok, Peer} = maps:find(PeerID, S#state.peers),
+            #peer{ pid = Peer } =
+                peer_table:lookup_by_id(S#state.peer_table, PeerID),
             ok = peer_controller:recv_incoming_packet(Peer, SentTime, Commands)
     end,
     {noreply, S};

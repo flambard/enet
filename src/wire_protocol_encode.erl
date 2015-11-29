@@ -89,22 +89,22 @@ command(#ping{}) ->
     ?PING(<<>>);
 
 command(C = #send_reliable{}) ->
-    ?SEND_RELIABLE(size(C#send_reliable.data),
+    ?SEND_RELIABLE(byte_size(C#send_reliable.data),
                    C#send_reliable.data);
 
 command(C = #send_unreliable{}) ->
     ?SEND_UNRELIABLE(C#send_unreliable.unreliable_sequence_number,
-                     size(C#send_unreliable.data),
+                     byte_size(C#send_unreliable.data),
                      C#send_unreliable.data);
 
 command(C = #send_unsequenced{}) ->
     ?SEND_UNSEQUENCED(C#send_unsequenced.unsequenced_group,
-                      size(C#send_unsequenced.data),
+                      byte_size(C#send_unsequenced.data),
                       C#send_unsequenced.data);
 
 command(C = #send_fragment{}) ->
     ?SEND_FRAGMENT(C#send_fragment.start_sequence_number,
-                   size(C#send_fragment.data),
+                   byte_size(C#send_fragment.data),
                    C#send_fragment.fragment_count,
                    C#send_fragment.fragment_number,
                    C#send_fragment.total_length,
