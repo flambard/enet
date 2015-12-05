@@ -7,6 +7,8 @@
 -export([ make_acknowledge_command/2
         , make_connect_command/5
         , make_verify_connect_command/2
+        , make_sequenced_disconnect_command/0
+        , make_unsequenced_disconnect_command/0
         , calculate_initial_window_size/1
         ]).
 
@@ -91,6 +93,26 @@ make_verify_connect_command(C = #connect{}, PeerInfo = #peer_info{}) ->
       , packet_throttle_deceleration = C#connect.packet_throttle_deceleration
       , connect_id = C#connect.connect_id
       }
+    }.
+
+
+make_sequenced_disconnect_command() ->
+    {
+      #command_header{
+         please_acknowledge = 1,
+         command = ?COMMAND_DISCONNECT
+        },
+      #disconnect{}
+    }.
+
+
+make_unsequenced_disconnect_command() ->
+    {
+      #command_header{
+         unsequenced = 1,
+         command = ?COMMAND_DISCONNECT
+        },
+      #disconnect{}
     }.
 
 
