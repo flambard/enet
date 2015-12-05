@@ -106,6 +106,7 @@ handle_call({register_peer_controller, Address, Port, ID} , {PeerPid, _}, S) ->
         case peer_table:insert(PeerTable, PeerPid, Address, Port, ID) of
             {error, table_full} -> {error, reached_peer_limit};
             {ok, PeerInfo}      ->
+                %% NOTE: Dialyzer incorrectly warns that this will never match.
                 {ok, PeerInfo#peer_info{ host_data = S#state.data }}
         end,
     {reply, Reply, S};

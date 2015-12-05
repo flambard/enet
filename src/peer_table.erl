@@ -16,6 +16,10 @@ new(Limit) ->
     ets:insert(Table, [#peer{ id = ID } || ID <- lists:seq(0, Limit - 1)]),
     Table.
 
+
+%% Dialyzer warns incorrectly about matching here, ignore.
+-dialyzer({no_match, insert/5}).
+
 insert(Table, PeerPid, Address, Port, RemotePeerID) ->
     case ets:match_object(Table, #peer{ pid = undefined, _ = '_' }, 1) of
         '$end_of_table'                 -> {error, table_full};

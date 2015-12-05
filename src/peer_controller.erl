@@ -127,8 +127,6 @@ init({remote_connect, Host, C = #connect{}, IP, Port}) ->
     case host_controller:register_peer_controller(Host, IP, Port, RemoteID) of
         {error, reached_peer_limit}   -> {stop, reached_peer_limit};
         {ok, PeerInfo = #peer_info{}} ->
-            %% {sent_time, _AckSentTime} =
-            %%     host_controller:send_outgoing_commands(Host, AckPacket),
             S = #state{ host = Host
                       , host_data = PeerInfo#peer_info.host_data
                       },
