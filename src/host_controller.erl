@@ -4,6 +4,7 @@
 -include("peer.hrl").
 -include("peer_info.hrl").
 -include("commands.hrl").
+-include("protocol.hrl").
 
 %% API
 -export([ start_link/1
@@ -72,6 +73,7 @@ send_outgoing_commands(Host, Commands, Address, Port, PeerID) ->
 %%%===================================================================
 
 init({Port, Options}) ->
+    process_flag(trap_exit, true),
     PeerLimit =
         case lists:keyfind(peer_limit, 1, Options) of
             {peer_limit, PLimit} -> PLimit;
@@ -208,6 +210,31 @@ handle_info({udp, Socket, IP, Port, Packet},
             #peer{ pid = Peer } =
                 peer_table:lookup_by_id(S#state.peer_table, PeerID),
             ok = peer_controller:recv_incoming_packet(Peer, SentTime, Commands)
+    end,
+    {noreply, S};
+
+handle_info({'EXIT', Pid, _Reason}, S) ->
+    %%
+    %% A Peer Controller process has exited.
+    %%
+    %% - Send an unsequenced Disconnect message
+    %% - Remove it from the Peer Table
+    %%
+    case peer_table:take(S#state.peer_table, Pid) of
+        not_found -> ok;
+        #peer{ remote_id = PeerID,
+               address = Address,
+               port = Port } ->
+            SentTime = 0, %% TODO
+            PH = #protocol_header{
+                    peer_id = PeerID,
+                    sent_time = SentTime
+                   },
+            {CH, Command} = protocol:make_unsequenced_disconnect_command(),
+            Packet = [ wire_protocol_encode:protocol_header(PH),
+                       wire_protocol_encode:command_header(CH),
+                       wire_protocol_encode:command(Command) ],
+            ok = gen_udp:send(S#state.socket, Address, Port, Packet)
     end,
     {noreply, S};
 
