@@ -5,6 +5,7 @@
 
 -export([ new/1
         , insert/5
+        , take/2
         , set_remote_peer_id/3
         , lookup_by_id/2
         , lookup_by_pid/2
@@ -37,6 +38,14 @@ insert(Table, PeerPid, Address, Port, RemotePeerID) ->
                           , outgoing_session_id = P#peer.outgoing_session_id
                           },
             {ok, PeerInfo}
+    end.
+
+take(Table, PeerPid) ->
+    case ets:match_object(Table, #peer{ pid = PeerPid, _ = '_'}) of
+        []     -> not_found;
+        [Peer] ->
+            true = ets:delete_object(Table, Peer),
+            Peer
     end.
 
 set_remote_peer_id(Table, PeerPid, RemoteID) ->
