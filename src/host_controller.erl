@@ -34,7 +34,7 @@
         , decompress_fun
         }).
 
--define(NULL_PEER_ID, 16#FFF).
+-define(NULL_PEER_ID, ?MAX_PEER_ID).
 
 
 %%%===================================================================

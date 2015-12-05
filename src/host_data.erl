@@ -1,5 +1,7 @@
 -module(host_data).
 
+-include("constants.hrl").
+
 -export([ make/1
         , lookup/2
         , update/3
@@ -10,7 +12,7 @@ make(HostOptions) ->
     ChannelLimit =
         case lists:keyfind(channel_limit, 1, HostOptions) of
             {channel_limit, CLimit} -> CLimit;
-            false                   -> 1
+            false                   -> ?MIN_CHANNEL_COUNT
         end,
     IncomingBandwidth =
         case lists:keyfind(incoming_bandwidth, 1, HostOptions) of
@@ -26,7 +28,7 @@ make(HostOptions) ->
     ets:insert(HostData, [ {channel_limit, ChannelLimit}
                          , {incoming_bandwidth, IncomingBandwidth}
                          , {outgoing_bandwidth, OutgoingBandwidth}
-                         , {mtu, 0}
+                         , {mtu, ?HOST_DEFAULT_MTU}
                          ]),
     {ok, HostData}.
 
