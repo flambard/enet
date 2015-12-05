@@ -6,7 +6,8 @@
 -include("commands.hrl").
 
 %% API
--export([ start_link/2
+-export([ start_link/1
+        , start_link/2
         , register_peer_controller/3
         , register_peer_controller/4
         , set_remote_peer_id/2
@@ -40,8 +41,11 @@
 %%% API
 %%%===================================================================
 
-start_link(Port, PeerLimit) ->
-    gen_server:start_link(?MODULE, {Port, PeerLimit}, []).
+start_link(Port) ->
+    start_link(Port, []).
+
+start_link(Port, Options) ->
+    gen_server:start_link(?MODULE, {Port, Options}, []).
 
 register_peer_controller(Host, Address, Port) ->
     register_peer_controller(Host, Address, Port, undefined).
@@ -67,8 +71,13 @@ send_outgoing_commands(Host, Commands, Address, Port, PeerID) ->
 %%% gen_server callbacks
 %%%===================================================================
 
-init({Port, PeerLimit}) ->
-    {ok, HostData} = host_data:make(),
+init({Port, Options}) ->
+    PeerLimit =
+        case lists:keyfind(peer_limit, 1, Options) of
+            {peer_limit, PLimit} -> PLimit;
+            false                -> 1
+        end,
+    {ok, HostData} = host_data:make(Options),
     {ok, NullPeer} = null_peer:start_link(),
     SocketOptions = [ binary
                     , {active, true}
