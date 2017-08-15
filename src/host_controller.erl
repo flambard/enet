@@ -9,6 +9,7 @@
 %% API
 -export([ start_link/1
         , start_link/2
+        , stop/1
         , register_peer_controller/3
         , register_peer_controller/4
         , set_remote_peer_id/2
@@ -27,12 +28,12 @@
         ]).
 
 -record(state,
-        { socket
-        , null_peer
-        , peer_table
-        , data
-        , compress_fun
-        , decompress_fun
+        {
+          socket,
+          peer_table,
+          data,
+          compress_fun,
+          decompress_fun
         }).
 
 -define(NULL_PEER_ID, ?MAX_PEER_ID).
@@ -47,6 +48,9 @@ start_link(Port) ->
 
 start_link(Port, Options) ->
     gen_server:start_link(?MODULE, {Port, Options}, []).
+
+stop(Host) ->
+    gen_server:call(Host, stop).
 
 register_peer_controller(Host, Address, Port) ->
     register_peer_controller(Host, Address, Port, undefined).
@@ -80,20 +84,26 @@ init({Port, Options}) ->
             false                -> 1
         end,
     {ok, HostData} = host_data:make(Options),
-    {ok, NullPeer} = null_peer:start_link(),
-    SocketOptions = [ binary
-                    , {active, true}
+    SocketOptions = [
+                     binary,
+                     {active, true},
+                     {reuseaddr, true}
                     ],
     {ok, Socket} = gen_udp:open(Port, SocketOptions),
     {ok, #state{
             socket = Socket,
-            null_peer = NullPeer,
             peer_table = peer_table:new(PeerLimit),
             data = HostData
            }}.
 
+handle_call(stop, _From, S) ->
+    %%
+    %% Describe
+    %%
+    ok = gen_udp:close(S#state.socket),
+    {stop, stopped, ok, S};
 
-handle_call({register_peer_controller, Address, Port, ID} , {PeerPid, _}, S) ->
+handle_call({register_peer_controller, Address, Port, ID}, {PeerPid, _}, S) ->
     %%
     %% A new Peer Controller wants to register with the Host Controller.
     %%
@@ -203,13 +213,13 @@ handle_info({udp, Socket, IP, Port, Packet},
     case PH#protocol_header.peer_id of
         ?NULL_PEER_ID ->
             %% No particular peer is the receiver of this packet.
-            %% Send it to the "null peer".
-            ok = null_peer:recv_incoming_packet(
-                   S#state.null_peer, SentTime, Commands, IP, Port);
+            %% Create a new peer.
+            {ok, Pid} = peer_controller:remote_connect(self(), IP, Port),
+            ok = peer_controller:recv_incoming_packet(Pid, SentTime, Commands);
         PeerID ->
-            #peer{ pid = Peer } =
+            #peer{ pid = Pid } =
                 peer_table:lookup_by_id(S#state.peer_table, PeerID),
-            ok = peer_controller:recv_incoming_packet(Peer, SentTime, Commands)
+            ok = peer_controller:recv_incoming_packet(Pid, SentTime, Commands)
     end,
     {noreply, S};
 
