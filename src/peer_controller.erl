@@ -36,7 +36,10 @@
           port,
           packet_throttle_interval = ?PEER_PACKET_THROTTLE_INTERVAL,
           packet_throttle_acceleration = ?PEER_PACKET_THROTTLE_ACCELERATION,
-          packet_throttle_deceleration = ?PEER_PACKET_THROTTLE_DECELERATION
+          packet_throttle_deceleration = ?PEER_PACKET_THROTTLE_DECELERATION,
+          incoming_unsequenced_group = 0,
+          outgoing_unsequenced_group = 0,
+          unsequenced_window = 0
         }).
 
 
@@ -228,6 +231,29 @@ verifying_connect(_Event, State) ->
 %%%
 %%% Connected state
 %%%
+
+
+connected({outgoing_command,
+           {
+             Header = #command_header{ unsequenced = 1 },
+             Command = #send_unsequenced{}
+           }},
+          State) ->
+    %%
+    %% Sending an Unsequenced, unreliable command.
+    %%
+    %% - TODO: Increment total data passed through peer
+    %% - Increment outgoing_unsequenced_group
+    %% - Set unsequenced_group on command to outgoing_unsequenced_group
+    %% - Queue the command for sending
+    %%
+    NewGroup = State#state.outgoing_unsequenced_group + 1,
+    OutgoingCommand = Command#send_unsequenced{ unsequenced_group = NewGroup },
+    HBin = wire_protocol_encode:command_header(Header),
+    CBin = wire_protocol_encode:command(OutgoingCommand),
+    host_controller:send_outgoing_commands(State#state.host, [HBin, CBin]),
+    NewState = State#state{ outgoing_unsequenced_group = NewGroup },
+    {next_state, connected, NewState};
 
 connected(_Event, State) ->
     {next_state, connected, State}.
