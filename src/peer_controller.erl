@@ -26,6 +26,7 @@
         , acknowledging_verify_connect/2
         , verifying_connect/2
         , connected/2
+        , disconnecting/2
         ]).
 
 -record(state,
@@ -65,6 +66,26 @@
 %%                 |------------------->|
 %%     'connected' |                    | 'connected'
 %%                 |                    |
+%%
+%%
+%%==============================================================
+
+%%==============================================================
+%% Disconnect procedure
+%%==============================================================
+%%
+%%
+%%      state   client               server   state
+%%               peer                 peer
+%%                 |                    |
+%%     'connected' |                    | 'connected'
+%%                 |     disconnect     |
+%%                 |------------------->|
+%% 'disconnecting' |                    |
+%%                 |   ack disconnect   |
+%%                 |<-------------------|
+%%          (exit) |                    | (exit)
+%%                 *                    *
 %%
 %%
 %%==============================================================
@@ -277,8 +298,38 @@ connected({outgoing_command,
     NewState = State#state{ outgoing_unsequenced_group = NewGroup },
     {next_state, connected, NewState};
 
+connected({outgoing_command, {H, C = #disconnect{}}}, State) ->
+    %%
+    %% Sending a Disconnect command.
+    %%
+    %% - Queue the command for sending
+    %% - Change state to 'disconnecting'
+    %%
+    HBin = wire_protocol_encode:command_header(H),
+    CBin = wire_protocol_encode:command(C),
+    host_controller:send_outgoing_commands(State#state.host, [HBin, CBin]),
+    {next_state, disconnecting, State};
+
 connected(_Event, State) ->
     {next_state, connected, State}.
+
+
+%%%
+%%% Disconnecting state
+%%%
+
+disconnecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
+    %%
+    %% Received an Acknowledge command in the 'disconnecting' state.
+    %%
+    %% - Verify that the acknowledge is correct (TODO)
+    %% - TODO: Notify owner application?
+    %% - Stop
+    %%
+    {stop, normal, S};
+
+disconnecting(_Event, State) ->
+    {next_state, disconnecting, State}.
 
 
 %%--------------------------------------------------------------------
