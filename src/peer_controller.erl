@@ -137,7 +137,7 @@ init({remote_connect, Host, IP, Port}) ->
 %%% Connecting state
 %%%
 
-connecting({incoming_command, _SentTime, {_H, _C = #acknowledge{}}}, S) ->
+connecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command in the 'connecting' state.
     %%
@@ -151,7 +151,7 @@ connecting({incoming_command, _SentTime, {_H, _C = #acknowledge{}}}, S) ->
 %%% Acknowledging Connect state
 %%%
 
-acknowledging_connect({incoming_command, _SentTime, {_H, C = #connect{}}}, S) ->
+acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     %%
     %% Received a Connect command.
     %%
@@ -183,7 +183,7 @@ acknowledging_connect({incoming_command, _SentTime, {_H, C = #connect{}}}, S) ->
 %%% Acknowledging Verify Connect state
 %%%
 
-acknowledging_verify_connect({incoming_command, _SentTime, {_H, C = #verify_connect{}}}, S) ->
+acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S) ->
     %%
     %% Received a Verify Connect command in the 'acknowledging_verify_connect'
     %% state.
@@ -205,7 +205,7 @@ acknowledging_verify_connect(_Event, State) ->
 %%% Verifying Connect state
 %%%
 
-verifying_connect({incoming_command, _SentTime, {_H, _C = #acknowledge{}}}, S) ->
+verifying_connect({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command in the 'verifying_connect' state.
     %%
@@ -222,7 +222,7 @@ verifying_connect(_Event, State) ->
 %%% Connected state
 %%%
 
-connected({incoming_command, _SentTime, {_H, #ping{}}}, S) ->
+connected({incoming_command, {_H, #ping{}}}, S) ->
     %%
     %% Received PING.
     %%
@@ -230,7 +230,7 @@ connected({incoming_command, _SentTime, {_H, #ping{}}}, S) ->
     %%
     {next_state, connected, S};
 
-connected({incoming_command, _SentTime, {_H, #bandwidth_limit{}}}, S) ->
+connected({incoming_command, {_H, #bandwidth_limit{}}}, S) ->
     %%
     %% Received Bandwidth Limit command.
     %%
@@ -238,7 +238,7 @@ connected({incoming_command, _SentTime, {_H, #bandwidth_limit{}}}, S) ->
     %%
     {next_state, connected, S};
 
-connected({incoming_command, _SentTime, {_H, #throttle_configure{}}}, S) ->
+connected({incoming_command, {_H, #throttle_configure{}}}, S) ->
     %%
     %% Received Throttle Configure command.
     %%
@@ -246,7 +246,7 @@ connected({incoming_command, _SentTime, {_H, #throttle_configure{}}}, S) ->
     %%
     {next_state, connected, S};
 
-connected({incoming_command, _SentTime, {_H, #disconnect{}}}, S) ->
+connected({incoming_command, {_H, #disconnect{}}}, S) ->
     %%
     %% Received Disconnect command.
     %%
@@ -320,7 +320,7 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
               {sent_time, _AckSentTime} =
                   host_controller:send_outgoing_commands(
                     Host, [HBin, CBin], IP, Port, RemotePeerID),
-              gen_fsm:send_event(self(), {incoming_command, SentTime, {H, C}});
+              gen_fsm:send_event(self(), {incoming_command, {H, C}});
           ({H = #command_header{ please_acknowledge = 1 }, C}) ->
               %%
               %% Received a command that should be acknowledged.
@@ -336,14 +336,14 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
               {sent_time, _AckSentTime} =
                   host_controller:send_outgoing_commands(
                     Host, [HBin, CBin], IP, Port, RemotePeerID),
-              gen_fsm:send_event(self(), {incoming_command, SentTime, {H, C}});
+              gen_fsm:send_event(self(), {incoming_command, {H, C}});
           ({H = #command_header{ please_acknowledge = 0 }, C}) ->
               %%
               %% Received command that does not need to be acknowledged.
               %%
               %% - Send the command to self for handling
               %%
-              gen_fsm:send_event(self(), {incoming_command, SentTime, {H, C}})
+              gen_fsm:send_event(self(), {incoming_command, {H, C}})
       end,
       Commands),
     {next_state, StateName, S};
