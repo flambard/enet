@@ -237,6 +237,66 @@ verifying_connect(_Event, State) ->
 %%% Connected state
 %%%
 
+connected({incoming_command, SentTime, {Header, #ping{}}}, S) ->
+    %%
+    %% Received PING.
+    %%
+    %% - Acknowledge the command
+    %% - Do nothing
+    %%
+    Host = S#state.host,
+    {AckH, AckC} = protocol:make_acknowledge_command(Header, SentTime),
+    HBin = wire_protocol_encode:command_header(AckH),
+    CBin = wire_protocol_encode:command(AckC),
+    {sent_time, _AckSentTime} =
+        host_controller:send_outgoing_commands(Host, [HBin, CBin]),
+    {next_state, connected, S};
+
+connected({incoming_command, SentTime, {Header, #bandwidth_limit{}}}, S) ->
+    %%
+    %% Received Bandwidth Limit command.
+    %%
+    %% - Acknowledge the command
+    %% - TODO: Set bandwidth limit
+    %%
+    Host = S#state.host,
+    {AckH, AckC} = protocol:make_acknowledge_command(Header, SentTime),
+    HBin = wire_protocol_encode:command_header(AckH),
+    CBin = wire_protocol_encode:command(AckC),
+    {sent_time, _AckSentTime} =
+        host_controller:send_outgoing_commands(Host, [HBin, CBin]),
+    {next_state, connected, S};
+
+connected({incoming_command, SentTime, {Header, #throttle_configure{}}}, S) ->
+    %%
+    %% Received Throttle Configure command.
+    %%
+    %% - Acknowledge the command
+    %% - TODO: Set throttle configuration
+    %%
+    Host = S#state.host,
+    {AckH, AckC} = protocol:make_acknowledge_command(Header, SentTime),
+    HBin = wire_protocol_encode:command_header(AckH),
+    CBin = wire_protocol_encode:command(AckC),
+    {sent_time, _AckSentTime} =
+        host_controller:send_outgoing_commands(Host, [HBin, CBin]),
+    {next_state, connected, S};
+
+connected({incoming_command, SentTime, {Header, #disconnect{}}}, S) ->
+    %%
+    %% Received Disconnect command.
+    %%
+    %% - Acknowledge the command
+    %% - TODO: Notify owner application?
+    %% - Stop
+    %%
+    Host = S#state.host,
+    {AckH, AckC} = protocol:make_acknowledge_command(Header, SentTime),
+    HBin = wire_protocol_encode:command_header(AckH),
+    CBin = wire_protocol_encode:command(AckC),
+    {sent_time, _AckSentTime} =
+        host_controller:send_outgoing_commands(Host, [HBin, CBin]),
+    {stop, normal, S};
 
 connected({outgoing_command,
            {
