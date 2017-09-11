@@ -34,6 +34,7 @@
           host_data,
           ip,
           port,
+          remote_peer_id = undefined,
           packet_throttle_interval = ?PEER_PACKET_THROTTLE_INTERVAL,
           packet_throttle_acceleration = ?PEER_PACKET_THROTTLE_ACCELERATION,
           packet_throttle_deceleration = ?PEER_PACKET_THROTTLE_DECELERATION,
@@ -178,7 +179,10 @@ acknowledging_connect({incoming_command, SentTime, {H, C = #connect{}}}, S) ->
             CBin = wire_protocol_encode:command(VCC),
             {sent_time, _VerifyConnectSentTime} =
                 host_controller:send_outgoing_commands(Host, [HBin, CBin]),
-            NewS = S#state{ host_data = PeerInfo#peer_info.host_data },
+            NewS = S#state{
+                     host_data = PeerInfo#peer_info.host_data,
+                     remote_peer_id = RemoteID
+                    },
             {next_state, verifying_connect, NewS}
     end.
 
@@ -205,7 +209,8 @@ acknowledging_verify_connect({incoming_command, SentTime, {H, C = #verify_connec
     CBin = wire_protocol_encode:command(AckC),
     {sent_time, _AckSentTime} =
         host_controller:send_outgoing_commands(Host, [HBin, CBin]),
-    {next_state, connected, S};
+    NewS = S#state{ remote_peer_id = RemotePeerID },
+    {next_state, connected, NewS};
 
 acknowledging_verify_connect(_Event, State) ->
     {next_state, acknowledging_verify_connect, State}.
