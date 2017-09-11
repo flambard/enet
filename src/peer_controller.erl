@@ -151,25 +151,17 @@ connecting({incoming_command, _SentTime, {_H, _C = #acknowledge{}}}, S) ->
 %%% Acknowledging Connect state
 %%%
 
-acknowledging_connect({incoming_command, SentTime, {H, C = #connect{}}}, S) ->
+acknowledging_connect({incoming_command, _SentTime, {_H, C = #connect{}}}, S) ->
     %%
     %% Received a Connect command.
     %%
     %% - Verify that the data is sane (TODO)
-    %% - Acknowledge the command
     %% - Establish a connection with the host (returns peer ID)
     %% - Send the prepared Acknowledge packet
     %% - Send a VerifyConnect command (use peer ID)
     %% - Start in the 'verifying_connect' state
     %%
-    {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
-    AckHBin = wire_protocol_encode:command_header(AckH),
-    AckCBin = wire_protocol_encode:command(AckC),
     #state{ host = Host, ip = IP, port = Port } = S,
-    {sent_time, _AckSentTime} =
-        host_controller:send_outgoing_commands(
-          Host, [AckHBin, AckCBin], IP, Port, C#connect.outgoing_peer_id),
-
     RemoteID = C#connect.outgoing_peer_id,
     case host_controller:register_peer_controller(Host, IP, Port, RemoteID) of
         {error, reached_peer_limit}   -> {stop, reached_peer_limit};
@@ -191,24 +183,17 @@ acknowledging_connect({incoming_command, SentTime, {H, C = #connect{}}}, S) ->
 %%% Acknowledging Verify Connect state
 %%%
 
-acknowledging_verify_connect({incoming_command, SentTime, {H, C = #verify_connect{}}}, S) ->
+acknowledging_verify_connect({incoming_command, _SentTime, {_H, C = #verify_connect{}}}, S) ->
     %%
     %% Received a Verify Connect command in the 'acknowledging_verify_connect'
     %% state.
     %%
     %% - Verify that the data is correct (TODO)
     %% - Add the remote peer ID to the Peer Table (TODO)
-    %% - Acknowledge the command
     %% - Change state to 'connected'
     %%
-    Host = S#state.host,
     RemotePeerID = C#verify_connect.outgoing_peer_id,
-    ok = host_controller:set_remote_peer_id(Host, RemotePeerID),
-    {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
-    HBin = wire_protocol_encode:command_header(AckH),
-    CBin = wire_protocol_encode:command(AckC),
-    {sent_time, _AckSentTime} =
-        host_controller:send_outgoing_commands(Host, [HBin, CBin]),
+    ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
     NewS = S#state{ remote_peer_id = RemotePeerID },
     {next_state, connected, NewS};
 
@@ -237,71 +222,43 @@ verifying_connect(_Event, State) ->
 %%% Connected state
 %%%
 
-connected({incoming_command, SentTime, {Header, #ping{}}}, S) ->
+connected({incoming_command, _SentTime, {_H, #ping{}}}, S) ->
     %%
     %% Received PING.
     %%
-    %% - Acknowledge the command
     %% - Do nothing
     %%
-    Host = S#state.host,
-    {AckH, AckC} = protocol:make_acknowledge_command(Header, SentTime),
-    HBin = wire_protocol_encode:command_header(AckH),
-    CBin = wire_protocol_encode:command(AckC),
-    {sent_time, _AckSentTime} =
-        host_controller:send_outgoing_commands(Host, [HBin, CBin]),
     {next_state, connected, S};
 
-connected({incoming_command, SentTime, {Header, #bandwidth_limit{}}}, S) ->
+connected({incoming_command, _SentTime, {_H, #bandwidth_limit{}}}, S) ->
     %%
     %% Received Bandwidth Limit command.
     %%
-    %% - Acknowledge the command
     %% - TODO: Set bandwidth limit
     %%
-    Host = S#state.host,
-    {AckH, AckC} = protocol:make_acknowledge_command(Header, SentTime),
-    HBin = wire_protocol_encode:command_header(AckH),
-    CBin = wire_protocol_encode:command(AckC),
-    {sent_time, _AckSentTime} =
-        host_controller:send_outgoing_commands(Host, [HBin, CBin]),
     {next_state, connected, S};
 
-connected({incoming_command, SentTime, {Header, #throttle_configure{}}}, S) ->
+connected({incoming_command, _SentTime, {_H, #throttle_configure{}}}, S) ->
     %%
     %% Received Throttle Configure command.
     %%
-    %% - Acknowledge the command
     %% - TODO: Set throttle configuration
     %%
-    Host = S#state.host,
-    {AckH, AckC} = protocol:make_acknowledge_command(Header, SentTime),
-    HBin = wire_protocol_encode:command_header(AckH),
-    CBin = wire_protocol_encode:command(AckC),
-    {sent_time, _AckSentTime} =
-        host_controller:send_outgoing_commands(Host, [HBin, CBin]),
     {next_state, connected, S};
 
-connected({incoming_command, SentTime, {Header, #disconnect{}}}, S) ->
+connected({incoming_command, _SentTime, {_H, #disconnect{}}}, S) ->
     %%
     %% Received Disconnect command.
     %%
-    %% - Acknowledge the command
     %% - TODO: Notify owner application?
     %% - Stop
     %%
-    Host = S#state.host,
-    {AckH, AckC} = protocol:make_acknowledge_command(Header, SentTime),
-    HBin = wire_protocol_encode:command_header(AckH),
-    CBin = wire_protocol_encode:command(AckC),
-    {sent_time, _AckSentTime} =
-        host_controller:send_outgoing_commands(Host, [HBin, CBin]),
     {stop, normal, S};
 
 connected({outgoing_command,
            {
-             Header = #command_header{ unsequenced = 1 },
-             Command = #send_unsequenced{}
+             H = #command_header{ unsequenced = 1 },
+             C = #send_unsequenced{}
            }},
           State) ->
     %%
@@ -313,8 +270,8 @@ connected({outgoing_command,
     %% - Queue the command for sending
     %%
     NewGroup = State#state.outgoing_unsequenced_group + 1,
-    OutgoingCommand = Command#send_unsequenced{ unsequenced_group = NewGroup },
-    HBin = wire_protocol_encode:command_header(Header),
+    OutgoingCommand = C#send_unsequenced{ unsequenced_group = NewGroup },
+    HBin = wire_protocol_encode:command_header(H),
     CBin = wire_protocol_encode:command(OutgoingCommand),
     host_controller:send_outgoing_commands(State#state.host, [HBin, CBin]),
     NewState = State#state{ outgoing_unsequenced_group = NewGroup },
@@ -344,10 +301,49 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
     %% - Split and decode the commands from the binary
     %% - Send the commands as individual events to ourselves
     %%
+    #state{ ip = IP, port = Port } = S,
     {ok, Commands} = wire_protocol_decode:commands(Packet),
     lists:foreach(
-      fun (C) ->
-              gen_fsm:send_event(self(), {incoming_command, SentTime, C})
+      fun ({H = #command_header{ please_acknowledge = 1 }, C = #connect{}}) ->
+              %%
+              %% Received a Connect command.
+              %%
+              %% - Acknowledge the command using the remote Peer ID included in
+              %%   the command itself
+              %% - Send the command to self for handling
+              %%
+              Host = S#state.host,
+              {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
+              HBin = wire_protocol_encode:command_header(AckH),
+              CBin = wire_protocol_encode:command(AckC),
+              RemotePeerID = C#connect.outgoing_peer_id,
+              {sent_time, _AckSentTime} =
+                  host_controller:send_outgoing_commands(
+                    Host, [HBin, CBin], IP, Port, RemotePeerID),
+              gen_fsm:send_event(self(), {incoming_command, SentTime, {H, C}});
+          ({H = #command_header{ please_acknowledge = 1 }, C}) ->
+              %%
+              %% Received a command that should be acknowledged.
+              %%
+              %% - Acknowledge the command using the stored remote Peer ID
+              %% - Send the command to self for handling
+              %%
+              Host = S#state.host,
+              {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
+              HBin = wire_protocol_encode:command_header(AckH),
+              CBin = wire_protocol_encode:command(AckC),
+              RemotePeerID = S#state.remote_peer_id,
+              {sent_time, _AckSentTime} =
+                  host_controller:send_outgoing_commands(
+                    Host, [HBin, CBin], IP, Port, RemotePeerID),
+              gen_fsm:send_event(self(), {incoming_command, SentTime, {H, C}});
+          ({H = #command_header{ please_acknowledge = 0 }, C}) ->
+              %%
+              %% Received command that does not need to be acknowledged.
+              %%
+              %% - Send the command to self for handling
+              %%
+              gen_fsm:send_event(self(), {incoming_command, SentTime, {H, C}})
       end,
       Commands),
     {next_state, StateName, S};
