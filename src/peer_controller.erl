@@ -178,7 +178,6 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     %%
     %% - Verify that the data is sane (TODO)
     %% - Establish a connection with the host (returns peer ID)
-    %% - Send the prepared Acknowledge packet
     %% - Send a VerifyConnect command (use peer ID)
     %% - Start in the 'verifying_connect' state
     %%
