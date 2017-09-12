@@ -342,62 +342,33 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
     #state{ ip = IP, port = Port } = S,
     {ok, Commands} = wire_protocol_decode:commands(Packet),
     lists:foreach(
-      fun ({H = #command_header{ please_acknowledge = 1 }, C = #connect{}}) ->
-              %%
-              %% Received a Connect command.
-              %%
-              %% - Acknowledge the command using the remote Peer ID included in
-              %%   the command itself
-              %% - Send the command to self for handling
-              %%
-              Host = S#state.host,
-              {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
-              HBin = wire_protocol_encode:command_header(AckH),
-              CBin = wire_protocol_encode:command(AckC),
-              RemotePeerID = C#connect.outgoing_peer_id,
-              {sent_time, _AckSentTime} =
-                  host_controller:send_outgoing_commands(
-                    Host, [HBin, CBin], IP, Port, RemotePeerID),
-              gen_fsm:send_event(self(), {incoming_command, {H, C}});
-          ({H = #command_header{ please_acknowledge = 1 }, C = #verify_connect{}}) ->
-              %%
-              %% Received a Verify Connect command.
-              %%
-              %% - Acknowledge the command using the remote Peer ID included in
-              %%   the command itself
-              %% - Send the command to self for handling
-              %%
-              Host = S#state.host,
-              {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
-              HBin = wire_protocol_encode:command_header(AckH),
-              CBin = wire_protocol_encode:command(AckC),
-              RemotePeerID = C#verify_connect.outgoing_peer_id,
-              {sent_time, _AckSentTime} =
-                  host_controller:send_outgoing_commands(
-                    Host, [HBin, CBin], IP, Port, RemotePeerID),
-              gen_fsm:send_event(self(), {incoming_command, {H, C}});
-          ({H = #command_header{ please_acknowledge = 1 }, C}) ->
-              %%
-              %% Received a command that should be acknowledged.
-              %%
-              %% - Acknowledge the command using the stored remote Peer ID
-              %% - Send the command to self for handling
-              %%
-              Host = S#state.host,
-              {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
-              HBin = wire_protocol_encode:command_header(AckH),
-              CBin = wire_protocol_encode:command(AckC),
-              RemotePeerID = S#state.remote_peer_id,
-              {sent_time, _AckSentTime} =
-                  host_controller:send_outgoing_commands(
-                    Host, [HBin, CBin], IP, Port, RemotePeerID),
-              gen_fsm:send_event(self(), {incoming_command, {H, C}});
-          ({H = #command_header{ please_acknowledge = 0 }, C}) ->
+      fun ({H = #command_header{ please_acknowledge = 0 }, C}) ->
               %%
               %% Received command that does not need to be acknowledged.
               %%
               %% - Send the command to self for handling
               %%
+              gen_fsm:send_event(self(), {incoming_command, {H, C}});
+          ({H = #command_header{ please_acknowledge = 1 }, C}) ->
+              %%
+              %% Received a command that should be acknowledged.
+              %%
+              %% - Acknowledge the command
+              %% - Send the command to self for handling
+              %%
+              Host = S#state.host,
+              {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
+              HBin = wire_protocol_encode:command_header(AckH),
+              CBin = wire_protocol_encode:command(AckC),
+              RemotePeerID =
+                  case C of
+                      #connect{}        -> C#connect.outgoing_peer_id;
+                      #verify_connect{} -> C#verify_connect.outgoing_peer_id;
+                      _                 -> S#state.remote_peer_id
+                  end,
+              {sent_time, _AckSentTime} =
+                  host_controller:send_outgoing_commands(
+                    Host, [HBin, CBin], IP, Port, RemotePeerID),
               gen_fsm:send_event(self(), {incoming_command, {H, C}})
       end,
       Commands),
