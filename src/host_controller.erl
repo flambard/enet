@@ -101,7 +101,7 @@ handle_call(stop, _From, S) ->
     %% Describe
     %%
     ok = gen_udp:close(S#state.socket),
-    {stop, stopped, ok, S};
+    {stop, normal, ok, S};
 
 handle_call({register_peer_controller, Address, Port, ID}, {PeerPid, _}, S) ->
     %%
