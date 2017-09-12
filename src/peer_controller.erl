@@ -319,19 +319,11 @@ disconnecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     {stop, normal, S}.
 
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Whenever a gen_fsm receives an event sent using
-%% gen_fsm:send_all_state_event/2, this function is called to handle
-%% the event.
-%%
-%% @spec handle_event(Event, StateName, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
-%% @end
-%%--------------------------------------------------------------------
+
+%%%
+%%% handle_event
+%%%
+
 handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
     %%
     %% Received an incoming packet of commands.
@@ -374,72 +366,38 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
       Commands),
     {next_state, StateName, S};
 
-handle_event(_Event, StateName, State) ->
-    {next_state, StateName, State}.
+handle_event(_Event, _StateName, State) ->
+    {stop, unexpected_event, State}.
 
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Whenever a gen_fsm receives an event sent using
-%% gen_fsm:sync_send_all_state_event/[2,3], this function is called
-%% to handle the event.
-%%
-%% @spec handle_sync_event(Event, From, StateName, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {reply, Reply, NextStateName, NextState} |
-%%                   {reply, Reply, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState} |
-%%                   {stop, Reason, Reply, NewState}
-%% @end
-%%--------------------------------------------------------------------
-handle_sync_event(_Event, _From, StateName, State) ->
-    Reply = ok,
-    {reply, Reply, StateName, State}.
+%%%
+%%% handle_sync_event
+%%%
+
+handle_sync_event(_Event, _From, _StateName, State) ->
+    {stop, unexpected_event, State}.
 
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_fsm when it receives any
-%% message other than a synchronous or asynchronous event
-%% (or a system message).
-%%
-%% @spec handle_info(Info,StateName,State)->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
-%% @end
-%%--------------------------------------------------------------------
-handle_info(_Info, StateName, State) ->
-    {next_state, StateName, State}.
+%%%
+%%% handle_info
+%%%
+
+handle_info(_Info, _StateName, State) ->
+    {stop, unexpected_message, State}.
 
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_fsm when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_fsm terminates with
-%% Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, StateName, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
+%%%
+%%% terminate
+%%%
+
 terminate(_Reason, _StateName, _State) ->
     ok.
 
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, StateName, State, Extra) ->
-%%                   {ok, StateName, NewState}
-%% @end
-%%--------------------------------------------------------------------
+%%%
+%%% code_change
+%%%
+
 code_change(_OldVsn, StateName, State, _Extra) ->
     {ok, StateName, State}.
 
