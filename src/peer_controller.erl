@@ -215,10 +215,7 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
     RemotePeerID = C#verify_connect.outgoing_peer_id,
     ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
     NewS = S#state{ remote_peer_id = RemotePeerID },
-    {next_state, connected, NewS};
-
-acknowledging_verify_connect(_Event, State) ->
-    {next_state, acknowledging_verify_connect, State}.
+    {next_state, connected, NewS}.
 
 
 %%%
@@ -232,10 +229,7 @@ verifying_connect({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %% - Verify that the acknowledge is correct (TODO)
     %% - Change to 'connected' state
     %%
-    {next_state, connected, S};
-
-verifying_connect(_Event, State) ->
-    {next_state, verifying_connect, State}.
+    {next_state, connected, S}.
 
 
 %%%
@@ -307,10 +301,7 @@ connected({outgoing_command, {H, C = #disconnect{}}}, State) ->
     HBin = wire_protocol_encode:command_header(H),
     CBin = wire_protocol_encode:command(C),
     host_controller:send_outgoing_commands(State#state.host, [HBin, CBin]),
-    {next_state, disconnecting, State};
-
-connected(_Event, State) ->
-    {next_state, connected, State}.
+    {next_state, disconnecting, State}.
 
 
 %%%
@@ -325,10 +316,7 @@ disconnecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %% - TODO: Notify owner application?
     %% - Stop
     %%
-    {stop, normal, S};
-
-disconnecting(_Event, State) ->
-    {next_state, disconnecting, State}.
+    {stop, normal, S}.
 
 
 %%--------------------------------------------------------------------
