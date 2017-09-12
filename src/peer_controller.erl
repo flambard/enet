@@ -359,6 +359,23 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
                   host_controller:send_outgoing_commands(
                     Host, [HBin, CBin], IP, Port, RemotePeerID),
               gen_fsm:send_event(self(), {incoming_command, {H, C}});
+          ({H = #command_header{ please_acknowledge = 1 }, C = #verify_connect{}}) ->
+              %%
+              %% Received a Verify Connect command.
+              %%
+              %% - Acknowledge the command using the remote Peer ID included in
+              %%   the command itself
+              %% - Send the command to self for handling
+              %%
+              Host = S#state.host,
+              {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
+              HBin = wire_protocol_encode:command_header(AckH),
+              CBin = wire_protocol_encode:command(AckC),
+              RemotePeerID = C#verify_connect.outgoing_peer_id,
+              {sent_time, _AckSentTime} =
+                  host_controller:send_outgoing_commands(
+                    Host, [HBin, CBin], IP, Port, RemotePeerID),
+              gen_fsm:send_event(self(), {incoming_command, {H, C}});
           ({H = #command_header{ please_acknowledge = 1 }, C}) ->
               %%
               %% Received a command that should be acknowledged.
