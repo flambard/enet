@@ -14,7 +14,6 @@
         , register_peer_controller/3
         , register_peer_controller/4
         , set_remote_peer_id/2
-        , send_outgoing_commands/2
         , send_outgoing_commands/4
         , send_outgoing_commands/5
         ]).
@@ -65,9 +64,6 @@ register_peer_controller(Host, Address, Port, PeerID) ->
 
 set_remote_peer_id(Host, RemotePeerID) ->
     gen_server:call(Host, {set_remote_peer_id, RemotePeerID}).
-
-send_outgoing_commands(Host, Commands) ->
-    gen_server:call(Host, {send_outgoing_commands, Commands}).
 
 send_outgoing_commands(Host, Commands, Address, Port) ->
     send_outgoing_commands(Host, Commands, Address, Port, ?NULL_PEER_ID).
@@ -155,28 +151,6 @@ handle_call({set_remote_peer_id, PeerID} , {PeerPid, _}, S) ->
     %%
     peer_table:set_remote_peer_id(S#state.peer_table, PeerPid, PeerID),
     {reply, ok, S};
-
-handle_call({send_outgoing_commands, Commands}, {PeerPid, _}, S) ->
-    %%
-    %% Received outgoing commands from a peer.
-    %%
-    %% - Compress commands if compressor available (TODO)
-    %% - Wrap the commands in a protocol header
-    %% - Send the packet
-    %% - Return sent time
-    %%
-    #peer{ remote_id = PeerID
-         , address = Address
-         , port = Port
-         } = peer_table:lookup_by_pid(S#state.peer_table, PeerPid),
-    SentTime = 0, %% TODO
-    PH = #protocol_header{
-            peer_id = PeerID,
-            sent_time = SentTime
-           },
-    Packet = [wire_protocol_encode:protocol_header(PH), Commands],
-    ok = gen_udp:send(S#state.socket, Address, Port, Packet),
-    {reply, {sent_time, SentTime}, S};
 
 handle_call({send_outgoing_commands, Commands, Address, Port, ID}, _From, S) ->
     %%

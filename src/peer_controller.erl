@@ -196,17 +196,15 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     %% - Start in the 'verifying_connect' state
     %%
     #state{ host = Host, ip = IP, port = Port, peer_info = PeerInfo } = S,
-    RemoteID = C#connect.outgoing_peer_id,
+    RemotePeerID = C#connect.outgoing_peer_id,
     {VCH, VCC} = protocol:make_verify_connect_command(C, PeerInfo),
     HBin = wire_protocol_encode:command_header(VCH),
     CBin = wire_protocol_encode:command(VCC),
     {sent_time, _VerifyConnectSentTime} =
         host_controller:send_outgoing_commands(
-          Host, [HBin, CBin], IP, Port, RemoteID),
-    NewS = S#state{
-             host_data = PeerInfo#peer_info.host_data,
-             remote_peer_id = RemoteID
-            },
+          Host, [HBin, CBin], IP, Port, RemotePeerID),
+    ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
+    NewS = S#state{ remote_peer_id = RemotePeerID },
     {next_state, verifying_connect, NewS}.
 
 
@@ -294,12 +292,14 @@ connected({outgoing_command,
     %% - Set unsequenced_group on command to outgoing_unsequenced_group
     %% - Queue the command for sending
     %%
+    #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = State,
     NewGroup = State#state.outgoing_unsequenced_group + 1,
     OutgoingCommand = C#send_unsequenced{ unsequenced_group = NewGroup },
     HBin = wire_protocol_encode:command_header(H),
     CBin = wire_protocol_encode:command(OutgoingCommand),
     {sent_time, _SentTime} =
-        host_controller:send_outgoing_commands(State#state.host, [HBin, CBin]),
+        host_controller:send_outgoing_commands(
+          State#state.host, [HBin, CBin], IP, Port, RemotePeerID),
     NewState = State#state{ outgoing_unsequenced_group = NewGroup },
     {next_state, connected, NewState};
 
@@ -310,10 +310,12 @@ connected(disconnect, State) ->
     %% - Queue a Disconnect command for sending
     %% - Change state to 'disconnecting'
     %%
+    #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = State,
     {H, C} = protocol:make_sequenced_disconnect_command(),
     HBin = wire_protocol_encode:command_header(H),
     CBin = wire_protocol_encode:command(C),
-    host_controller:send_outgoing_commands(State#state.host, [HBin, CBin]),
+    host_controller:send_outgoing_commands(
+      State#state.host, [HBin, CBin], IP, Port, RemotePeerID),
     {next_state, disconnecting, State}.
 
 
