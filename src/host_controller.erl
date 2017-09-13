@@ -10,6 +10,7 @@
 -export([ start_link/1
         , start_link/2
         , stop/1
+        , connect/3
         , register_peer_controller/3
         , register_peer_controller/4
         , set_remote_peer_id/2
@@ -51,6 +52,9 @@ start_link(Port, Options) ->
 
 stop(Host) ->
     gen_server:call(Host, stop).
+
+connect(Host, Address, Port) ->
+    gen_server:call(Host, {connect, Address, Port, self()}).
 
 register_peer_controller(Host, Address, Port) ->
     register_peer_controller(Host, Address, Port, undefined).
@@ -102,6 +106,23 @@ handle_call(stop, _From, S) ->
     %%
     ok = gen_udp:close(S#state.socket),
     {stop, normal, ok, S};
+
+handle_call({connect, Address, Port, Owner}, _From, S) ->
+    %%
+    %% Describe
+    %%
+    Table = S#state.peer_table,
+    Reply =
+        case peer_table:insert(Table, undefined, Address, Port, undefined) of
+            {error, table_full}                  -> {error, reached_peer_limit};
+            {ok, PI = #peer_info{ id = PeerID }} ->
+                PeerInfo = PI#peer_info{ host_data = S#state.data },
+                {ok, Pid} = peer_controller:local_connect(
+                              PeerInfo, Address, Port, Owner),
+                true = peer_table:set_peer_pid(Table, PeerID, Pid),
+                {ok, Pid}
+        end,
+    {reply, Reply, S};
 
 handle_call({register_peer_controller, Address, Port, ID}, {PeerPid, _}, S) ->
     %%

@@ -6,7 +6,7 @@
 -include("protocol.hrl").
 
 %% API
--export([ local_connect/3
+-export([ local_connect/4
         , remote_connect/3
         , disconnect/1
         , recv_incoming_packet/3
@@ -32,6 +32,7 @@
 
 -record(state,
         {
+          owner,
           host,
           host_data,
           ip,
@@ -96,8 +97,9 @@
 %%% API
 %%%===================================================================
 
-local_connect(Host, IP, Port) ->
-    gen_fsm:start(?MODULE, {local_connect, Host, IP, Port}, []).
+local_connect(PeerInfo, IP, Port, Owner) ->
+    gen_fsm:start(?MODULE,
+                  {local_connect, self(), PeerInfo, IP, Port, Owner}, []).
 
 remote_connect(Host, IP, Port) ->
     gen_fsm:start(?MODULE, {remote_connect, Host, IP, Port}, []).
@@ -113,38 +115,22 @@ recv_incoming_packet(Peer, SentTime, Packet) ->
 %%% gen_fsm callbacks
 %%%===================================================================
 
-init({local_connect, Host, IP, Port}) ->
+init({local_connect, Host, PeerInfo, IP, Port, Owner}) ->
     %%
     %% The client application wants to connect to a remote peer.
     %%
-    %% - Establish a connection with the host (returns peer ID)
     %% - Send a Connect command to the remote peer (use peer ID)
     %% - Start in the 'connecting' state
     %%
-    case host_controller:register_peer_controller(Host, IP, Port) of
-        {error, reached_peer_limit}   -> {stop, reached_peer_limit};
-        {ok, PeerInfo = #peer_info{}} ->
-            S = #state{
-                   host = Host,
-                   host_data = PeerInfo#peer_info.host_data,
-                   ip = IP,
-                   port = Port
-                  },
-            <<ConnectID:32>> = crypto:strong_rand_bytes(4),
-            {ConnectH, ConnectC} =
-                protocol:make_connect_command(
-                  PeerInfo,
-                  S#state.packet_throttle_interval,
-                  S#state.packet_throttle_acceleration,
-                  S#state.packet_throttle_deceleration,
-                  ConnectID),
-            HBin = wire_protocol_encode:command_header(ConnectH),
-            CBin = wire_protocol_encode:command(ConnectC),
-            Packet = [HBin, CBin],
-            {sent_time, _ConnectSentTime} =
-                host_controller:send_outgoing_commands(Host, Packet, IP, Port),
-            {ok, connecting, S}
-    end;
+    ok = gen_fsm:send_event(self(), {send_connect, PeerInfo}),
+    S = #state{
+           owner = Owner,
+           host = Host,
+           host_data = PeerInfo#peer_info.host_data,
+           ip = IP,
+           port = Port
+          },
+    {ok, connecting, S};
 
 init({remote_connect, Host, IP, Port}) ->
     %%
@@ -161,6 +147,25 @@ init({remote_connect, Host, IP, Port}) ->
 %%%
 %%% Connecting state
 %%%
+
+connecting({send_connect, PeerInfo}, S) ->
+    %%
+    %% Sending the initial Connect command.
+    %%
+    #state{ host = Host, ip = IP, port = Port } = S,
+    <<ConnectID:32>> = crypto:strong_rand_bytes(4),
+    {ConnectH, ConnectC} =
+        protocol:make_connect_command(
+          PeerInfo,
+          S#state.packet_throttle_interval,
+          S#state.packet_throttle_acceleration,
+          S#state.packet_throttle_deceleration,
+          ConnectID),
+    HBin = wire_protocol_encode:command_header(ConnectH),
+    CBin = wire_protocol_encode:command(ConnectC),
+    {sent_time, _ConnectSentTime} =
+        host_controller:send_outgoing_commands(Host, [HBin, CBin], IP, Port),
+    {next_state, connecting, S};
 
 connecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %%
@@ -291,7 +296,8 @@ connected({outgoing_command,
     OutgoingCommand = C#send_unsequenced{ unsequenced_group = NewGroup },
     HBin = wire_protocol_encode:command_header(H),
     CBin = wire_protocol_encode:command(OutgoingCommand),
-    host_controller:send_outgoing_commands(State#state.host, [HBin, CBin]),
+    {sent_time, _SentTime} =
+        host_controller:send_outgoing_commands(State#state.host, [HBin, CBin]),
     NewState = State#state{ outgoing_unsequenced_group = NewGroup },
     {next_state, connected, NewState};
 
@@ -322,7 +328,6 @@ disconnecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %% - Stop
     %%
     {stop, normal, S}.
-
 
 
 %%%

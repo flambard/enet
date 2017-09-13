@@ -6,7 +6,7 @@
 local_disconnect_test() ->
     {ok, L} = host_controller:start_link(5001, [{peer_limit, 8}]),
     {ok, R} = host_controller:start_link(5002, [{peer_limit, 8}]),
-    {ok, Peer} = peer_controller:local_connect(L, "127.0.0.1", 5002),
+    {ok, Peer} = host_controller:connect(L, "127.0.0.1", 5002),
     Ref = erlang:monitor(process, Peer),
     receive after 500 -> continue end,
     ok = peer_controller:disconnect(Peer),
@@ -23,7 +23,7 @@ local_disconnect_test() ->
 remote_disconnect_test() ->
     {ok, L} = host_controller:start_link(5001, [{peer_limit, 8}]),
     {ok, R} = host_controller:start_link(5002, [{peer_limit, 8}]),
-    {ok, Peer} = peer_controller:local_connect(R, "127.0.0.1", 5002),
+    {ok, Peer} = host_controller:connect(R, "127.0.0.1", 5001),
     Ref = erlang:monitor(process, Peer),
     receive after 500 -> continue end,
     ok = peer_controller:disconnect(Peer),
