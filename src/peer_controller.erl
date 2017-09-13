@@ -7,7 +7,7 @@
 
 %% API
 -export([ local_connect/4
-        , remote_connect/3
+        , remote_connect/4
         , disconnect/1
         , recv_incoming_packet/3
         ]).
@@ -38,6 +38,7 @@
           ip,
           port,
           remote_peer_id = undefined,
+          peer_info,
           packet_throttle_interval = ?PEER_PACKET_THROTTLE_INTERVAL,
           packet_throttle_acceleration = ?PEER_PACKET_THROTTLE_ACCELERATION,
           packet_throttle_deceleration = ?PEER_PACKET_THROTTLE_DECELERATION,
@@ -101,8 +102,9 @@ local_connect(PeerInfo, IP, Port, Owner) ->
     gen_fsm:start(?MODULE,
                   {local_connect, self(), PeerInfo, IP, Port, Owner}, []).
 
-remote_connect(Host, IP, Port) ->
-    gen_fsm:start(?MODULE, {remote_connect, Host, IP, Port}, []).
+remote_connect(PeerInfo, IP, Port, Owner) ->
+    gen_fsm:start(?MODULE,
+                  {remote_connect, self(), PeerInfo, IP, Port, Owner}, []).
 
 disconnect(Peer) ->
     gen_fsm:send_event(Peer, disconnect).
@@ -122,24 +124,28 @@ init({local_connect, Host, PeerInfo, IP, Port, Owner}) ->
     %% - Send a Connect command to the remote peer (use peer ID)
     %% - Start in the 'connecting' state
     %%
-    ok = gen_fsm:send_event(self(), {send_connect, PeerInfo}),
+    ok = gen_fsm:send_event(self(), send_connect),
     S = #state{
            owner = Owner,
            host = Host,
            host_data = PeerInfo#peer_info.host_data,
            ip = IP,
-           port = Port
+           port = Port,
+           peer_info = PeerInfo
           },
     {ok, connecting, S};
 
-init({remote_connect, Host, IP, Port}) ->
+init({remote_connect, Host, PeerInfo, IP, Port, Owner}) ->
     %%
     %% Describe
     %%
     S = #state{
+           owner = Owner,
            host = Host,
+           host_data = PeerInfo#peer_info.host_data,
            ip = IP,
-           port = Port
+           port = Port,
+           peer_info = PeerInfo
           },
     {ok, acknowledging_connect, S}.
 
@@ -148,11 +154,11 @@ init({remote_connect, Host, IP, Port}) ->
 %%% Connecting state
 %%%
 
-connecting({send_connect, PeerInfo}, S) ->
+connecting(send_connect, S) ->
     %%
     %% Sending the initial Connect command.
     %%
-    #state{ host = Host, ip = IP, port = Port } = S,
+    #state{ host = Host, ip = IP, port = Port, peer_info = PeerInfo } = S,
     <<ConnectID:32>> = crypto:strong_rand_bytes(4),
     {ConnectH, ConnectC} =
         protocol:make_connect_command(
@@ -186,26 +192,22 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     %% Received a Connect command.
     %%
     %% - Verify that the data is sane (TODO)
-    %% - Establish a connection with the host (returns peer ID)
     %% - Send a VerifyConnect command (use peer ID)
     %% - Start in the 'verifying_connect' state
     %%
-    #state{ host = Host, ip = IP, port = Port } = S,
+    #state{ host = Host, ip = IP, port = Port, peer_info = PeerInfo } = S,
     RemoteID = C#connect.outgoing_peer_id,
-    case host_controller:register_peer_controller(Host, IP, Port, RemoteID) of
-        {error, reached_peer_limit}   -> {stop, reached_peer_limit};
-        {ok, PeerInfo = #peer_info{}} ->
-            {VCH, VCC} = protocol:make_verify_connect_command(C, PeerInfo),
-            HBin = wire_protocol_encode:command_header(VCH),
-            CBin = wire_protocol_encode:command(VCC),
-            {sent_time, _VerifyConnectSentTime} =
-                host_controller:send_outgoing_commands(Host, [HBin, CBin]),
-            NewS = S#state{
-                     host_data = PeerInfo#peer_info.host_data,
-                     remote_peer_id = RemoteID
-                    },
-            {next_state, verifying_connect, NewS}
-    end.
+    {VCH, VCC} = protocol:make_verify_connect_command(C, PeerInfo),
+    HBin = wire_protocol_encode:command_header(VCH),
+    CBin = wire_protocol_encode:command(VCC),
+    {sent_time, _VerifyConnectSentTime} =
+        host_controller:send_outgoing_commands(
+          Host, [HBin, CBin], IP, Port, RemoteID),
+    NewS = S#state{
+             host_data = PeerInfo#peer_info.host_data,
+             remote_peer_id = RemoteID
+            },
+    {next_state, verifying_connect, NewS}.
 
 
 %%%

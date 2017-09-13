@@ -237,8 +237,18 @@ handle_info({udp, Socket, IP, Port, Packet},
         ?NULL_PEER_ID ->
             %% No particular peer is the receiver of this packet.
             %% Create a new peer.
-            {ok, Pid} = peer_controller:remote_connect(self(), IP, Port),
-            ok = peer_controller:recv_incoming_packet(Pid, SentTime, Commands);
+            PeerTable = S#state.peer_table,
+            case peer_table:insert(PeerTable, undefined, IP, Port, undefined) of
+                {error, table_full}                  -> reached_peer_limit;
+                {ok, PI = #peer_info{ id = PeerID }} ->
+                    Owner = S#state.owner,
+                    PeerInfo = PI#peer_info{ host_data = S#state.data },
+                    {ok, Pid} = peer_controller:remote_connect(
+                                  PeerInfo, IP, Port, Owner),
+                    true = peer_table:set_peer_pid(PeerTable, PeerID, Pid),
+                    ok = peer_controller:recv_incoming_packet(
+                           Pid, SentTime, Commands)
+            end;
         PeerID ->
             #peer{ pid = Pid } =
                 peer_table:lookup_by_id(S#state.peer_table, PeerID),
