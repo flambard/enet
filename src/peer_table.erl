@@ -6,6 +6,7 @@
 -export([ new/1
         , insert/5
         , take/2
+        , set_peer_pid/3
         , set_remote_peer_id/3
         , lookup_by_id/2
         , lookup_by_pid/2
@@ -46,6 +47,12 @@ take(Table, PeerPid) ->
         [Peer] ->
             true = ets:delete_object(Table, Peer),
             Peer
+    end.
+
+set_peer_pid(Table, PeerID, PeerPid) ->
+    case ets:lookup(Table, PeerID) of
+        []  -> not_found;
+        [P] -> ets:update_element(Table, P#peer.id, {#peer.pid, PeerPid})
     end.
 
 set_remote_peer_id(Table, PeerPid, RemoteID) ->
