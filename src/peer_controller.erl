@@ -8,6 +8,7 @@
 %% API
 -export([ local_connect/3
         , remote_connect/3
+        , disconnect/1
         , recv_incoming_packet/3
         ]).
 
@@ -100,6 +101,9 @@ local_connect(Host, IP, Port) ->
 
 remote_connect(Host, IP, Port) ->
     gen_fsm:start(?MODULE, {remote_connect, Host, IP, Port}, []).
+
+disconnect(Peer) ->
+    gen_fsm:send_event(Peer, disconnect).
 
 recv_incoming_packet(Peer, SentTime, Packet) ->
     gen_fsm:send_all_state_event(Peer, {incoming_packet, SentTime, Packet}).
@@ -291,13 +295,14 @@ connected({outgoing_command,
     NewState = State#state{ outgoing_unsequenced_group = NewGroup },
     {next_state, connected, NewState};
 
-connected({outgoing_command, {H, C = #disconnect{}}}, State) ->
+connected(disconnect, State) ->
     %%
-    %% Sending a Disconnect command.
+    %% Disconnecting.
     %%
-    %% - Queue the command for sending
+    %% - Queue a Disconnect command for sending
     %% - Change state to 'disconnecting'
     %%
+    {H, C} = protocol:make_sequenced_disconnect_command(),
     HBin = wire_protocol_encode:command_header(H),
     CBin = wire_protocol_encode:command(C),
     host_controller:send_outgoing_commands(State#state.host, [HBin, CBin]),
