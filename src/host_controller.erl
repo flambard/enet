@@ -11,8 +11,6 @@
         , start_link/2
         , stop/1
         , connect/3
-        , register_peer_controller/3
-        , register_peer_controller/4
         , set_remote_peer_id/2
         , send_outgoing_commands/4
         , send_outgoing_commands/5
@@ -55,12 +53,6 @@ stop(Host) ->
 
 connect(Host, Address, Port) ->
     gen_server:call(Host, {connect, Address, Port, self()}).
-
-register_peer_controller(Host, Address, Port) ->
-    register_peer_controller(Host, Address, Port, undefined).
-
-register_peer_controller(Host, Address, Port, PeerID) ->
-    gen_server:call(Host, {register_peer_controller, Address, Port, PeerID}).
 
 set_remote_peer_id(Host, RemotePeerID) ->
     gen_server:call(Host, {set_remote_peer_id, RemotePeerID}).
@@ -119,26 +111,6 @@ handle_call({connect, Address, Port, Owner}, _From, S) ->
                               PeerInfo, Address, Port, Owner),
                 true = peer_table:set_peer_pid(Table, PeerID, Pid),
                 {ok, Pid}
-        end,
-    {reply, Reply, S};
-
-handle_call({register_peer_controller, Address, Port, ID}, {PeerPid, _}, S) ->
-    %%
-    %% A new Peer Controller wants to register with the Host Controller.
-    %%
-    %% - Create a link between the processes
-    %% - Add the peer controller to the registry
-    %% - Return a peer_info record with peer ID, session IDs, and a reference
-    %%   to the Host Data table
-    %%
-    link(PeerPid),
-    PeerTable = S#state.peer_table,
-    Reply =
-        case peer_table:insert(PeerTable, PeerPid, Address, Port, ID) of
-            {error, table_full} -> {error, reached_peer_limit};
-            {ok, PeerInfo}      ->
-                %% NOTE: Dialyzer incorrectly warns that this will never match.
-                {ok, PeerInfo#peer_info{ host_data = S#state.data }}
         end,
     {reply, Reply, S};
 
