@@ -141,12 +141,7 @@ handle_call({send_outgoing_commands, Commands, Address, Port, ID}, _From, S) ->
            },
     Packet = [wire_protocol_encode:protocol_header(PH), Commands],
     ok = gen_udp:send(S#state.socket, Address, Port, Packet),
-    {reply, {sent_time, SentTime}, S};
-
-
-handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+    {reply, {sent_time, SentTime}, S}.
 
 
 %%%
@@ -225,10 +220,7 @@ handle_info({'DOWN', _Ref, process, Pid, _Reason}, S) ->
                        wire_protocol_encode:command(Command) ],
             ok = gen_udp:send(S#state.socket, Address, Port, Packet)
     end,
-    {noreply, S};
-
-handle_info(_Info, State) ->
-    {noreply, State}.
+    {noreply, S}.
 
 
 %%%

@@ -378,10 +378,7 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
               gen_fsm:send_event(self(), {incoming_command, {H, C}})
       end,
       Commands),
-    {next_state, StateName, S};
-
-handle_event(_Event, _StateName, State) ->
-    {stop, unexpected_event, State}.
+    {next_state, StateName, S}.
 
 
 %%%
