@@ -30,6 +30,7 @@
 
 -record(state,
         {
+          owner,
           socket,
           peer_table,
           data,
@@ -48,7 +49,7 @@ start_link(Port) ->
     start_link(Port, []).
 
 start_link(Port, Options) ->
-    gen_server:start_link(?MODULE, {Port, Options}, []).
+    gen_server:start_link(?MODULE, {self(), Port, Options}, []).
 
 stop(Host) ->
     gen_server:call(Host, stop).
@@ -80,7 +81,7 @@ send_outgoing_commands(Host, Commands, Address, Port, PeerID) ->
 %%% gen_server callbacks
 %%%===================================================================
 
-init({Port, Options}) ->
+init({Owner, Port, Options}) ->
     process_flag(trap_exit, true),
     PeerLimit =
         case lists:keyfind(peer_limit, 1, Options) of
@@ -95,6 +96,7 @@ init({Port, Options}) ->
                     ],
     {ok, Socket} = gen_udp:open(Port, SocketOptions),
     {ok, #state{
+            owner = Owner,
             socket = Socket,
             peer_table = peer_table:new(PeerLimit),
             data = HostData
