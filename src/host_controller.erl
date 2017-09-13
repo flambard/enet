@@ -109,6 +109,7 @@ handle_call({connect, Address, Port, Owner}, _From, S) ->
                 PeerInfo = PI#peer_info{ host_data = S#state.data },
                 {ok, Pid} = peer_controller:local_connect(
                               PeerInfo, Address, Port, Owner),
+                monitor(process, Pid),
                 true = peer_table:set_peer_pid(Table, PeerID, Pid),
                 {ok, Pid}
         end,
@@ -189,6 +190,7 @@ handle_info({udp, Socket, IP, Port, Packet},
                     PeerInfo = PI#peer_info{ host_data = S#state.data },
                     {ok, Pid} = peer_controller:remote_connect(
                                   PeerInfo, IP, Port, Owner),
+                    monitor(process, Pid),
                     true = peer_table:set_peer_pid(PeerTable, PeerID, Pid),
                     ok = peer_controller:recv_incoming_packet(
                            Pid, SentTime, Commands)
@@ -200,12 +202,12 @@ handle_info({udp, Socket, IP, Port, Packet},
     end,
     {noreply, S};
 
-handle_info({'EXIT', Pid, _Reason}, S) ->
+handle_info({'DOWN', _Ref, process, Pid, _Reason}, S) ->
     %%
     %% A Peer Controller process has exited.
     %%
-    %% - Send an unsequenced Disconnect message
     %% - Remove it from the Peer Table
+    %% - Send an unsequenced Disconnect message
     %%
     case peer_table:take(S#state.peer_table, Pid) of
         not_found -> ok;
