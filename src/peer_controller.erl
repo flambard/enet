@@ -238,8 +238,10 @@ verifying_connect({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %% Received an Acknowledge command in the 'verifying_connect' state.
     %%
     %% - Verify that the acknowledge is correct (TODO)
+    %% - Notify owner that a new peer has been connected
     %% - Change to 'connected' state
     %%
+    S#state.owner ! {enet, connect, remote, self()},
     {next_state, connected, S}.
 
 
