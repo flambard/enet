@@ -21,14 +21,14 @@ new(Limit) ->
 %% Dialyzer warns incorrectly about matching here, ignore.
 -dialyzer({no_match, insert/5}).
 
-insert(Table, PeerPid, Address, Port, RemotePeerID) ->
+insert(Table, PeerPid, IP, Port, RemotePeerID) ->
     case ets:match_object(Table, #peer{ pid = undefined, _ = '_' }, 1) of
         '$end_of_table'                 -> {error, table_full};
         {[P = #peer{ id = PeerID }], _} ->
             Peer = P#peer{ id = PeerID
                          , pid = PeerPid
                          , remote_id = RemotePeerID
-                         , address = Address
+                         , ip = IP
                          , port = Port
                          },
             true = ets:insert(Table, Peer),

@@ -51,18 +51,17 @@ start_link(Port, Options) ->
 stop(Host) ->
     gen_server:call(Host, stop).
 
-connect(Host, Address, Port) ->
-    gen_server:call(Host, {connect, Address, Port, self()}).
+connect(Host, IP, Port) ->
+    gen_server:call(Host, {connect, IP, Port, self()}).
 
 set_remote_peer_id(Host, RemotePeerID) ->
     gen_server:call(Host, {set_remote_peer_id, RemotePeerID}).
 
-send_outgoing_commands(Host, Commands, Address, Port) ->
-    send_outgoing_commands(Host, Commands, Address, Port, ?NULL_PEER_ID).
+send_outgoing_commands(Host, Commands, IP, Port) ->
+    send_outgoing_commands(Host, Commands, IP, Port, ?NULL_PEER_ID).
 
-send_outgoing_commands(Host, Commands, Address, Port, PeerID) ->
-    gen_server:call(Host,
-                    {send_outgoing_commands, Commands, Address, Port, PeerID}).
+send_outgoing_commands(Host, Commands, IP, Port, PeerID) ->
+    gen_server:call(Host, {send_outgoing_commands, Commands, IP, Port, PeerID}).
 
 
 %%%===================================================================
@@ -97,18 +96,18 @@ handle_call(stop, _From, S) ->
     ok = gen_udp:close(S#state.socket),
     {stop, normal, ok, S};
 
-handle_call({connect, Address, Port, Owner}, _From, S) ->
+handle_call({connect, IP, Port, Owner}, _From, S) ->
     %%
     %% Describe
     %%
     Table = S#state.peer_table,
     Reply =
-        case peer_table:insert(Table, undefined, Address, Port, undefined) of
+        case peer_table:insert(Table, undefined, IP, Port, undefined) of
             {error, table_full}                  -> {error, reached_peer_limit};
             {ok, PI = #peer_info{ id = PeerID }} ->
                 PeerInfo = PI#peer_info{ host_data = S#state.data },
-                {ok, Pid} = peer_controller:local_connect(
-                              PeerInfo, Address, Port, Owner),
+                {ok, Pid} =
+                    peer_controller:local_connect(PeerInfo, IP, Port, Owner),
                 monitor(process, Pid),
                 true = peer_table:set_peer_pid(Table, PeerID, Pid),
                 {ok, Pid}
@@ -125,7 +124,7 @@ handle_call({set_remote_peer_id, PeerID} , {PeerPid, _}, S) ->
     peer_table:set_remote_peer_id(S#state.peer_table, PeerPid, PeerID),
     {reply, ok, S};
 
-handle_call({send_outgoing_commands, Commands, Address, Port, ID}, _From, S) ->
+handle_call({send_outgoing_commands, Commands, IP, Port, ID}, _From, S) ->
     %%
     %% Received outgoing commands from a peer.
     %%
@@ -140,7 +139,7 @@ handle_call({send_outgoing_commands, Commands, Address, Port, ID}, _From, S) ->
             sent_time = SentTime
            },
     Packet = [wire_protocol_encode:protocol_header(PH), Commands],
-    ok = gen_udp:send(S#state.socket, Address, Port, Packet),
+    ok = gen_udp:send(S#state.socket, IP, Port, Packet),
     {reply, {sent_time, SentTime}, S}.
 
 
@@ -207,7 +206,7 @@ handle_info({'DOWN', _Ref, process, Pid, Reason}, S) ->
     case peer_table:take(S#state.peer_table, Pid) of
         not_found                    -> ok;
         _Peer when Reason =:= normal -> ok;
-        #peer{ remote_id = PeerID, address = Address, port = Port } ->
+        #peer{ remote_id = PeerID, ip = IP, port = Port } ->
             SentTime = 0, %% TODO
             PH = #protocol_header{
                     peer_id = PeerID,
@@ -217,7 +216,7 @@ handle_info({'DOWN', _Ref, process, Pid, Reason}, S) ->
             Packet = [ wire_protocol_encode:protocol_header(PH),
                        wire_protocol_encode:command_header(CH),
                        wire_protocol_encode:command(Command) ],
-            ok = gen_udp:send(S#state.socket, Address, Port, Packet)
+            ok = gen_udp:send(S#state.socket, IP, Port, Packet)
     end,
     {noreply, S}.
 
