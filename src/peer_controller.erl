@@ -218,11 +218,13 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
     %% state.
     %%
     %% - Verify that the data is correct (TODO)
-    %% - Add the remote peer ID to the Peer Table (TODO)
+    %% - Add the remote peer ID to the Peer Table
+    %% - Notify owner that we are connected
     %% - Change state to 'connected'
     %%
     RemotePeerID = C#verify_connect.outgoing_peer_id,
     ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
+    S#state.owner ! {enet, connect, local, self()},
     NewS = S#state{ remote_peer_id = RemotePeerID },
     {next_state, connected, NewS}.
 

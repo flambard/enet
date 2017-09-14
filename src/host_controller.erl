@@ -11,6 +11,7 @@
         , start_link/2
         , stop/1
         , connect/3
+        , sync_connect/3
         , set_remote_peer_id/2
         , send_outgoing_commands/4
         , send_outgoing_commands/5
@@ -53,6 +54,18 @@ stop(Host) ->
 
 connect(Host, IP, Port) ->
     gen_server:call(Host, {connect, IP, Port, self()}).
+
+sync_connect(Host, IP, Port) ->
+    case gen_server:call(Host, {connect, IP, Port, self()}) of
+        {error, Reason} -> {error, Reason};
+        {ok, Pid} ->
+            receive
+                {enet, connect, local, Pid} ->
+                    {ok, Pid}
+            after 1000 ->
+                    {error, timeout}
+            end
+    end.
 
 set_remote_peer_id(Host, RemotePeerID) ->
     gen_server:call(Host, {set_remote_peer_id, RemotePeerID}).
