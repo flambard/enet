@@ -146,7 +146,7 @@ handle_call({send_outgoing_commands, Commands, IP, Port, ID}, _From, S) ->
     %% - Send the packet
     %% - Return sent time
     %%
-    SentTime = 0, %% TODO
+    SentTime = get_time(),
     PH = #protocol_header{
             peer_id = ID,
             sent_time = SentTime
@@ -220,10 +220,9 @@ handle_info({'DOWN', _Ref, process, Pid, Reason}, S) ->
         not_found                    -> ok;
         _Peer when Reason =:= normal -> ok;
         #peer{ remote_id = PeerID, ip = IP, port = Port } ->
-            SentTime = 0, %% TODO
             PH = #protocol_header{
                     peer_id = PeerID,
-                    sent_time = SentTime
+                    sent_time = get_time()
                    },
             {CH, Command} = protocol:make_unsequenced_disconnect_command(),
             Packet = [ wire_protocol_encode:protocol_header(PH),
@@ -253,3 +252,6 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+get_time() ->
+    erlang:system_time(millisecond) band 16#FFFF.
