@@ -253,6 +253,14 @@ connected({incoming_command, {_H, #ping{}}}, S) ->
     %%
     {next_state, connected, S};
 
+connected({incoming_command, {_H, #acknowledge{}}}, S) ->
+    %%
+    %% Received an Acknowledge command.
+    %%
+    %% - Verify that the acknowledge is correct (TODO)
+    %%
+    {next_state, connected, S};
+
 connected({incoming_command, {_H, #bandwidth_limit{}}}, S) ->
     %%
     %% Received Bandwidth Limit command.
