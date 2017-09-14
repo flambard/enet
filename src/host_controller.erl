@@ -197,18 +197,17 @@ handle_info({udp, Socket, IP, Port, Packet},
     end,
     {noreply, S};
 
-handle_info({'DOWN', _Ref, process, Pid, _Reason}, S) ->
+handle_info({'DOWN', _Ref, process, Pid, Reason}, S) ->
     %%
     %% A Peer Controller process has exited.
     %%
     %% - Remove it from the Peer Table
-    %% - Send an unsequenced Disconnect message
+    %% - Send an unsequenced Disconnect message if the peer exited abnormally
     %%
     case peer_table:take(S#state.peer_table, Pid) of
-        not_found -> ok;
-        #peer{ remote_id = PeerID,
-               address = Address,
-               port = Port } ->
+        not_found                    -> ok;
+        _Peer when Reason =:= normal -> ok;
+        #peer{ remote_id = PeerID, address = Address, port = Port } ->
             SentTime = 0, %% TODO
             PH = #protocol_header{
                     peer_id = PeerID,
