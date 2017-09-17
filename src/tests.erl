@@ -4,9 +4,18 @@
 
 
 async_connect_and_local_disconnect_test() ->
-    {ok, L} = host_controller:start_link(5001, [{peer_limit, 8}]),
-    {ok, R} = host_controller:start_link(5002, [{peer_limit, 8}]),
-    {ok, LocalPeer} = host_controller:connect(L, "127.0.0.1", 5002),
+    enet_sup:start_link(),
+    LPort = 5001,
+    {ok, LHS} = enet_sup:start_host_supervisor(LPort),
+    {ok, LPS} = host_sup:start_peer_supervisor(LHS),
+    {ok, LHC} =
+        host_sup:start_host_controller(LHS, LPort, LPS, [{peer_limit, 8}]),
+    RPort = 5002,
+    {ok, RHS} = enet_sup:start_host_supervisor(RPort),
+    {ok, RPS} = host_sup:start_peer_supervisor(RHS),
+    {ok, _RHC} =
+        host_sup:start_host_controller(RHS, RPort, RPS, [{peer_limit, 8}]),
+    {ok, LocalPeer} = host_controller:connect(LHC, "127.0.0.1", RPort),
     Ref1 = monitor(process, LocalPeer),
     receive
         {enet, connect, local, LocalPeer} -> ok
@@ -33,14 +42,23 @@ async_connect_and_local_disconnect_test() ->
     after 1000 ->
             exit(remote_peer_did_not_exit)
     end,
-    ok = host_controller:stop(L),
-    ok = host_controller:stop(R),
+    enet_sup:stop_host_supervisor(LPort),
+    enet_sup:stop_host_supervisor(RPort),
     ok.
 
 sync_connect_and_remote_disconnect_test() ->
-    {ok, L} = host_controller:start_link(5001, [{peer_limit, 8}]),
-    {ok, R} = host_controller:start_link(5002, [{peer_limit, 8}]),
-    {ok, LocalPeer} = host_controller:sync_connect(R, "127.0.0.1", 5001),
+    enet_sup:start_link(),
+    LPort = 5001,
+    {ok, LHS} = enet_sup:start_host_supervisor(LPort),
+    {ok, LPS} = host_sup:start_peer_supervisor(LHS),
+    {ok, LHC} =
+        host_sup:start_host_controller(LHS, LPort, LPS, [{peer_limit, 8}]),
+    RPort = 5002,
+    {ok, RHS} = enet_sup:start_host_supervisor(RPort),
+    {ok, RPS} = host_sup:start_peer_supervisor(RHS),
+    {ok, _RHC} =
+        host_sup:start_host_controller(RHS, RPort, RPS, [{peer_limit, 8}]),
+    {ok, LocalPeer} = host_controller:sync_connect(LHC, "127.0.0.1", RPort),
     RemotePeer =
         receive
             {enet, connect, remote, P} -> P
@@ -62,6 +80,6 @@ sync_connect_and_remote_disconnect_test() ->
     after 1000 ->
             exit(remote_peer_did_not_exit)
     end,
-    ok = host_controller:stop(L),
-    ok = host_controller:stop(R),
+    enet_sup:stop_host_supervisor(LPort),
+    enet_sup:stop_host_supervisor(RPort),
     ok.

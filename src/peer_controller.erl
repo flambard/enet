@@ -6,28 +6,30 @@
 -include("protocol.hrl").
 
 %% API
--export([ local_connect/4
-        , remote_connect/4
-        , disconnect/1
-        , recv_incoming_packet/3
+-export([
+         start_link/6,
+         disconnect/1,
+         recv_incoming_packet/3
         ]).
 
 %% gen_fsm callbacks
--export([ init/1
-        , handle_event/3
-        , handle_sync_event/4
-        , handle_info/3
-        , terminate/3
-        , code_change/4
+-export([
+         init/1,
+         handle_event/3,
+         handle_sync_event/4,
+         handle_info/3,
+         terminate/3,
+         code_change/4
         ]).
 
 %% gen_fsm state functions
--export([ connecting/2
-        , acknowledging_connect/2
-        , acknowledging_verify_connect/2
-        , verifying_connect/2
-        , connected/2
-        , disconnecting/2
+-export([
+         connecting/2,
+         acknowledging_connect/2,
+         acknowledging_verify_connect/2,
+         verifying_connect/2,
+         connected/2,
+         disconnecting/2
         ]).
 
 -record(state,
@@ -98,13 +100,13 @@
 %%% API
 %%%===================================================================
 
-local_connect(PeerInfo, IP, Port, Owner) ->
-    gen_fsm:start(?MODULE,
-                  {local_connect, self(), PeerInfo, IP, Port, Owner}, []).
+start_link(local, Host, PeerInfo, IP, Port, Owner) ->
+    gen_fsm:start_link(
+      ?MODULE, {local_connect, Host, PeerInfo, IP, Port, Owner}, []);
 
-remote_connect(PeerInfo, IP, Port, Owner) ->
-    gen_fsm:start(?MODULE,
-                  {remote_connect, self(), PeerInfo, IP, Port, Owner}, []).
+start_link(remote, Host, PeerInfo, IP, Port, Owner) ->
+    gen_fsm:start_link(
+      ?MODULE, {remote_connect, Host, PeerInfo, IP, Port, Owner}, []).
 
 disconnect(Peer) ->
     gen_fsm:send_event(Peer, disconnect).

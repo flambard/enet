@@ -7,29 +7,32 @@
 -include("protocol.hrl").
 
 %% API
--export([ start_link/1
-        , start_link/2
-        , stop/1
-        , connect/3
-        , sync_connect/3
-        , set_remote_peer_id/2
-        , send_outgoing_commands/4
-        , send_outgoing_commands/5
+-export([
+         start_link/3,
+         start_link/4,
+         stop/1,
+         connect/3,
+         sync_connect/3,
+         set_remote_peer_id/2,
+         send_outgoing_commands/4,
+         send_outgoing_commands/5
         ]).
 
 %% gen_server callbacks
--export([ init/1
-        , handle_call/3
-        , handle_cast/2
-        , handle_info/2
-        , terminate/2
-        , code_change/3
+-export([
+         init/1,
+         handle_call/3,
+         handle_cast/2,
+         handle_info/2,
+         terminate/2,
+         code_change/3
         ]).
 
 -record(state,
         {
           owner,
           socket,
+          peer_sup,
           peer_table,
           data,
           compress_fun,
@@ -43,11 +46,11 @@
 %%% API
 %%%===================================================================
 
-start_link(Port) ->
-    start_link(Port, []).
+start_link(Owner, Port, PeerSup) ->
+    start_link(Owner, Port, PeerSup, []).
 
-start_link(Port, Options) ->
-    gen_server:start_link(?MODULE, {self(), Port, Options}, []).
+start_link(Owner, Port, PeerSup, Options) ->
+    gen_server:start_link(?MODULE, {Owner, Port, PeerSup, Options}, []).
 
 stop(Host) ->
     gen_server:call(Host, stop).
@@ -81,7 +84,7 @@ send_outgoing_commands(Host, Commands, IP, Port, PeerID) ->
 %%% gen_server callbacks
 %%%===================================================================
 
-init({Owner, Port, Options}) ->
+init({Owner, Port, PeerSup, Options}) ->
     process_flag(trap_exit, true),
     PeerLimit =
         case lists:keyfind(peer_limit, 1, Options) of
@@ -98,6 +101,7 @@ init({Owner, Port, Options}) ->
     {ok, #state{
             owner = Owner,
             socket = Socket,
+            peer_sup = PeerSup,
             peer_table = peer_table:new(PeerLimit),
             data = HostData
            }}.
@@ -119,8 +123,10 @@ handle_call({connect, IP, Port, Owner}, _From, S) ->
             {error, table_full}                  -> {error, reached_peer_limit};
             {ok, PI = #peer_info{ id = PeerID }} ->
                 PeerInfo = PI#peer_info{ host_data = S#state.data },
+                Sup = S#state.peer_sup,
                 {ok, Pid} =
-                    peer_controller:local_connect(PeerInfo, IP, Port, Owner),
+                    peer_sup:start_peer(
+                      Sup, local, self(), PeerInfo, IP, Port, Owner),
                 monitor(process, Pid),
                 true = peer_table:set_peer_pid(Table, PeerID, Pid),
                 {ok, Pid}
@@ -195,8 +201,10 @@ handle_info({udp, Socket, IP, Port, Packet},
                 {ok, PI = #peer_info{ id = PeerID }} ->
                     Owner = S#state.owner,
                     PeerInfo = PI#peer_info{ host_data = S#state.data },
-                    {ok, Pid} = peer_controller:remote_connect(
-                                  PeerInfo, IP, Port, Owner),
+                    Sup = S#state.peer_sup,
+                    {ok, Pid} =
+                        peer_sup:start_peer(
+                          Sup, remote, self(), PeerInfo, IP, Port, Owner),
                     monitor(process, Pid),
                     true = peer_table:set_peer_pid(PeerTable, PeerID, Pid),
                     ok = peer_controller:recv_incoming_packet(

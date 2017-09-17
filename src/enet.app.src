@@ -1,10 +1,13 @@
 {application, enet,
  [{description, "ENet - Reliable UDP networking library"},
   {vsn, "0.0.1"},
-  {registered, []},
-  {applications, [ kernel
-                 , stdlib
-                 , crypto
+  {registered, [ enet_sup ]},
+  {modules, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  crypto
                  ]},
+  {mod, {enet_app, []}},
   {env, []}
  ]}.
