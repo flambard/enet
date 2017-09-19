@@ -262,4 +262,4 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 get_time() ->
-    erlang:system_time(millisecond) band 16#FFFF.
+    erlang:system_time(1000) band 16#FFFF.
