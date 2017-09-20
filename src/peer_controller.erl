@@ -7,7 +7,7 @@
 
 %% API
 -export([
-         start_link/6,
+         start_link/8,
          disconnect/1,
          recv_incoming_packet/3
         ]).
@@ -37,6 +37,8 @@
           owner,
           host,
           host_data,
+          channel_sup,
+          channels,
           ip,
           port,
           remote_peer_id = undefined,
@@ -100,13 +102,17 @@
 %%% API
 %%%===================================================================
 
-start_link(local, Host, PeerInfo, IP, Port, Owner) ->
+start_link(local, Host, ChannelSup, N, PeerInfo, IP, Port, Owner) ->
     gen_fsm:start_link(
-      ?MODULE, {local_connect, Host, PeerInfo, IP, Port, Owner}, []);
+      ?MODULE,
+      {local_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner},
+      []);
 
-start_link(remote, Host, PeerInfo, IP, Port, Owner) ->
+start_link(remote, Host, ChannelSup, N, PeerInfo, IP, Port, Owner) ->
     gen_fsm:start_link(
-      ?MODULE, {remote_connect, Host, PeerInfo, IP, Port, Owner}, []).
+      ?MODULE,
+      {remote_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner},
+      []).
 
 disconnect(Peer) ->
     gen_fsm:send_event(Peer, disconnect).
@@ -119,16 +125,19 @@ recv_incoming_packet(Peer, SentTime, Packet) ->
 %%% gen_fsm callbacks
 %%%===================================================================
 
-init({local_connect, Host, PeerInfo, IP, Port, Owner}) ->
+init({local_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner}) ->
     %%
     %% The client application wants to connect to a remote peer.
     %%
     %% - Send a Connect command to the remote peer (use peer ID)
     %% - Start in the 'connecting' state
     %%
+    Channels = start_channels(ChannelSup, N, Owner),
     ok = gen_fsm:send_event(self(), send_connect),
     S = #state{
            owner = Owner,
+           channel_sup = ChannelSup,
+           channels = Channels,
            host = Host,
            host_data = PeerInfo#peer_info.host_data,
            ip = IP,
@@ -137,7 +146,7 @@ init({local_connect, Host, PeerInfo, IP, Port, Owner}) ->
           },
     {ok, connecting, S};
 
-init({remote_connect, Host, PeerInfo, IP, Port, Owner}) ->
+init({remote_connect, Host, ChannelSup, _N, PeerInfo, IP, Port, Owner}) ->
     %%
     %% Describe
     %%
@@ -145,6 +154,7 @@ init({remote_connect, Host, PeerInfo, IP, Port, Owner}) ->
            owner = Owner,
            host = Host,
            host_data = PeerInfo#peer_info.host_data,
+           channel_sup = ChannelSup,
            ip = IP,
            port = Port,
            peer_info = PeerInfo
@@ -160,11 +170,18 @@ connecting(send_connect, S) ->
     %%
     %% Sending the initial Connect command.
     %%
-    #state{ host = Host, ip = IP, port = Port, peer_info = PeerInfo } = S,
+    #state{
+       host = Host,
+       channels = Channels,
+       ip = IP,
+       port = Port,
+       peer_info = PeerInfo
+      } = S,
     <<ConnectID:32>> = crypto:strong_rand_bytes(4),
     {ConnectH, ConnectC} =
         protocol:make_connect_command(
           PeerInfo,
+          maps:size(Channels),
           S#state.packet_throttle_interval,
           S#state.packet_throttle_acceleration,
           S#state.packet_throttle_deceleration,
@@ -197,7 +214,14 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     %% - Send a VerifyConnect command (use peer ID)
     %% - Start in the 'verifying_connect' state
     %%
-    #state{ host = Host, ip = IP, port = Port, peer_info = PeerInfo } = S,
+    #state{
+       owner = Owner,
+       host = Host,
+       channel_sup = ChannelSup,
+       ip = IP,
+       port = Port,
+       peer_info = PeerInfo
+      } = S,
     RemotePeerID = C#connect.outgoing_peer_id,
     {VCH, VCC} = protocol:make_verify_connect_command(C, PeerInfo),
     HBin = wire_protocol_encode:command_header(VCH),
@@ -206,7 +230,8 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
         host_controller:send_outgoing_commands(
           Host, [HBin, CBin], IP, Port, RemotePeerID),
     ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
-    NewS = S#state{ remote_peer_id = RemotePeerID },
+    Channels = start_channels(ChannelSup, C#connect.channel_count, Owner),
+    NewS = S#state{ remote_peer_id = RemotePeerID, channels = Channels },
     {next_state, verifying_connect, NewS}.
 
 
@@ -430,3 +455,15 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+start_channels(ChannelSup, N, Owner) ->
+    IDs = lists:seq(0, N-1),
+    Channels =
+        lists:map(
+          fun (ID) ->
+                  {ok, Channel} =
+                      channel_sup:start_channel(ChannelSup, ID, self(), Owner),
+                  {ID, Channel}
+          end,
+          IDs),
+    maps:from_list(Channels).

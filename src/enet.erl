@@ -3,8 +3,8 @@
 -export([
          start_host/2,
          stop_host/1,
-         connect_peer/3,
-         sync_connect_peer/3,
+         connect_peer/4,
+         sync_connect_peer/4,
          disconnect_peer/1
         ]).
 
@@ -18,11 +18,11 @@ stop_host(Port) ->
     enet_sup:stop_host_supervisor(Port).
 
 
-connect_peer(Host, IP, Port) ->
-    host_controller:connect(Host, IP, Port).
+connect_peer(Host, IP, Port, ChannelCount) ->
+    host_controller:connect(Host, IP, Port, ChannelCount).
 
-sync_connect_peer(Host, IP, Port) ->
-    host_controller:sync_connect(Host, IP, Port).
+sync_connect_peer(Host, IP, Port, ChannelCount) ->
+    host_controller:sync_connect(Host, IP, Port, ChannelCount).
 
 disconnect_peer(Peer) ->
     peer_controller:disconnect(Peer).

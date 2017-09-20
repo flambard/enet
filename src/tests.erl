@@ -6,14 +6,15 @@
 local_zero_peer_limit_test() ->
     {ok, LocalHost}   = enet:start_host(5001, [{peer_limit, 0}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 1}]),
-    {error, reached_peer_limit} = enet:connect_peer(LocalHost, "127.0.0.1", 5002),
+    {error, reached_peer_limit} =
+        enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     ok = enet:stop_host(5001),
     ok = enet:stop_host(5002).
 
 remote_zero_peer_limit_test() ->
     {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 1}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 0}]),
-    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     receive
         {enet, connect, local, LocalPeer} ->
             exit(peer_could_connect_despite_peer_limit_reached);
@@ -28,7 +29,7 @@ remote_zero_peer_limit_test() ->
 async_connect_and_local_disconnect_test() ->
     {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}]),
-    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     receive
         {enet, connect, local, LocalPeer} -> ok
     after 1000 ->
@@ -60,7 +61,7 @@ async_connect_and_local_disconnect_test() ->
 sync_connect_and_remote_disconnect_test() ->
     {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}]),
-    {ok, LocalPeer} = enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002),
+    {ok, LocalPeer} = enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     RemotePeer =
         receive
             {enet, connect, remote, P} -> P

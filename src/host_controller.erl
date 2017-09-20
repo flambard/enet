@@ -11,8 +11,8 @@
          start_link/3,
          start_link/4,
          stop/1,
-         connect/3,
-         sync_connect/3,
+         connect/4,
+         sync_connect/4,
          set_remote_peer_id/2,
          send_outgoing_commands/4,
          send_outgoing_commands/5
@@ -55,11 +55,11 @@ start_link(Owner, Port, PeerSup, Options) ->
 stop(Host) ->
     gen_server:call(Host, stop).
 
-connect(Host, IP, Port) ->
-    gen_server:call(Host, {connect, IP, Port, self()}).
+connect(Host, IP, Port, ChannelCount) ->
+    gen_server:call(Host, {connect, IP, Port, ChannelCount, self()}).
 
-sync_connect(Host, IP, Port) ->
-    case gen_server:call(Host, {connect, IP, Port, self()}) of
+sync_connect(Host, IP, Port, ChannelCount) ->
+    case gen_server:call(Host, {connect, IP, Port, ChannelCount, self()}) of
         {error, Reason} -> {error, Reason};
         {ok, Pid} ->
             receive
@@ -113,7 +113,7 @@ handle_call(stop, _From, S) ->
     ok = gen_udp:close(S#state.socket),
     {stop, normal, ok, S};
 
-handle_call({connect, IP, Port, Owner}, _From, S) ->
+handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
     %%
     %% Describe
     %%
@@ -125,8 +125,8 @@ handle_call({connect, IP, Port, Owner}, _From, S) ->
                 PeerInfo = PI#peer_info{ host_data = S#state.data },
                 Sup = S#state.peer_sup,
                 {ok, Pid} =
-                    peer_sup:start_peer(
-                      Sup, local, self(), PeerInfo, IP, Port, Owner),
+                    start_peer(
+                      Sup, local, self(), Channels, PeerInfo, IP, Port, Owner),
                 monitor(process, Pid),
                 true = peer_table:set_peer_pid(Table, PeerID, Pid),
                 {ok, Pid}
@@ -202,9 +202,11 @@ handle_info({udp, Socket, IP, Port, Packet},
                     Owner = S#state.owner,
                     PeerInfo = PI#peer_info{ host_data = S#state.data },
                     Sup = S#state.peer_sup,
+                    %% Channel count is included in the Connect command
+                    N = undefined,
                     {ok, Pid} =
-                        peer_sup:start_peer(
-                          Sup, remote, self(), PeerInfo, IP, Port, Owner),
+                        start_peer(
+                          Sup, remote, self(), N, PeerInfo, IP, Port, Owner),
                     monitor(process, Pid),
                     true = peer_table:set_peer_pid(PeerTable, PeerID, Pid),
                     ok = peer_controller:recv_incoming_packet(
@@ -263,3 +265,10 @@ code_change(_OldVsn, State, _Extra) ->
 
 get_time() ->
     erlang:system_time(1000) band 16#FFFF.
+
+start_peer(PeerSup, LocalOrRemote, Host, N, PeerInfo, IP, Port, Owner) ->
+    ID = PeerInfo#peer_info.id,
+    {ok, PCSup} = peer_sup:start_peer_channel_supervisor(PeerSup, ID),
+    {ok, ChannelSup} = peer_channel_sup:start_channel_supervisor(PCSup),
+    peer_channel_sup:start_peer_controller(
+      PCSup, LocalOrRemote, Host, ChannelSup, N, PeerInfo, IP, Port, Owner).

@@ -4,12 +4,13 @@
 -include("commands.hrl").
 -include("protocol.hrl").
 
--export([ make_acknowledge_command/2
-        , make_connect_command/5
-        , make_verify_connect_command/2
-        , make_sequenced_disconnect_command/0
-        , make_unsequenced_disconnect_command/0
-        , calculate_initial_window_size/1
+-export([
+         make_acknowledge_command/2,
+         make_connect_command/6,
+         make_verify_connect_command/2,
+         make_sequenced_disconnect_command/0,
+         make_unsequenced_disconnect_command/0,
+         calculate_initial_window_size/1
         ]).
 
 
@@ -27,12 +28,12 @@ make_acknowledge_command(H = #command_header{}, SentTime) ->
 
 
 make_connect_command(PeerInfo = #peer_info{},
+                     ChannelCount,
                      PacketThrottleInterval,
                      PacketThrottleAcceleration,
                      PacketThrottleDeceleration,
                      ConnectID) ->
     HostData = PeerInfo#peer_info.host_data,
-    HostChannelLimit = host_data:lookup(HostData, channel_limit),
     IncomingBandwidth = host_data:lookup(HostData, incoming_bandwidth),
     OutgoingBandwidth = host_data:lookup(HostData, outgoing_bandwidth),
     WindowSize = protocol:calculate_initial_window_size(OutgoingBandwidth),
@@ -48,7 +49,7 @@ make_connect_command(PeerInfo = #peer_info{},
       , outgoing_session_id = PeerInfo#peer_info.outgoing_session_id
       , mtu = host_data:lookup(HostData, mtu)
       , window_size = WindowSize
-      , channel_count = HostChannelLimit
+      , channel_count = ChannelCount
       , incoming_bandwidth = IncomingBandwidth
       , outgoing_bandwidth = OutgoingBandwidth
       , packet_throttle_interval = PacketThrottleInterval
