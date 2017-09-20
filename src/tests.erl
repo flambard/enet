@@ -4,38 +4,31 @@
 
 
 local_zero_peer_limit_test() ->
-    LPort = 5001,
-    {ok, LHC} = enet:start_host(LPort, [{peer_limit, 0}]),
-    RPort = 5002,
-    {ok, _RHC} = enet:start_host(RPort, [{peer_limit, 1}]),
-    {error, reached_peer_limit} = enet:connect_peer(LHC, "127.0.0.1", RPort),
-    ok = enet:stop_host(LPort),
-    ok = enet:stop_host(RPort).
+    {ok, LocalHost}   = enet:start_host(5001, [{peer_limit, 0}]),
+    {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 1}]),
+    {error, reached_peer_limit} = enet:connect_peer(LocalHost, "127.0.0.1", 5002),
+    ok = enet:stop_host(5001),
+    ok = enet:stop_host(5002).
 
 remote_zero_peer_limit_test() ->
-    LPort = 5001,
-    {ok, LHC} = enet:start_host(LPort, [{peer_limit, 1}]),
-    RPort = 5002,
-    {ok, _RHC} = enet:start_host(RPort, [{peer_limit, 0}]),
-    {ok, Peer} = enet:connect_peer(LHC, "127.0.0.1", RPort),
+    {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 1}]),
+    {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 0}]),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002),
     receive
-        {enet, connect, local, Peer} ->
+        {enet, connect, local, LocalPeer} ->
             exit(peer_could_connect_despite_peer_limit_reached);
         {enet, connect, remote, _RemotePeer} ->
             exit(remote_peer_started_despite_peer_limit_reached)
     after 200 -> %% How long time is enough? (This is ugly)
             ok
     end,
-    ok = enet:stop_host(LPort),
-    ok = enet:stop_host(RPort).
+    ok = enet:stop_host(5001),
+    ok = enet:stop_host(5002).
 
 async_connect_and_local_disconnect_test() ->
-    LPort = 5001,
-    {ok, LHC} = enet:start_host(LPort, [{peer_limit, 8}]),
-    RPort = 5002,
-    {ok, _RHC} = enet:start_host(RPort, [{peer_limit, 8}]),
-    {ok, LocalPeer} = enet:connect_peer(LHC, "127.0.0.1", RPort),
-    Ref1 = monitor(process, LocalPeer),
+    {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}]),
+    {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}]),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002),
     receive
         {enet, connect, local, LocalPeer} -> ok
     after 1000 ->
@@ -47,6 +40,7 @@ async_connect_and_local_disconnect_test() ->
         after 1000 ->
                 exit(remote_peer_did_not_notify_owner)
         end,
+    Ref1 = monitor(process, LocalPeer),
     Ref2 = monitor(process, RemotePeer),
     ok = enet:disconnect_peer(LocalPeer),
     receive
@@ -59,16 +53,14 @@ async_connect_and_local_disconnect_test() ->
     after 1000 ->
             exit(remote_peer_did_not_exit)
     end,
-    ok = enet:stop_host(LPort),
-    ok = enet:stop_host(RPort),
+    ok = enet:stop_host(5001),
+    ok = enet:stop_host(5002),
     ok.
 
 sync_connect_and_remote_disconnect_test() ->
-    LPort = 5001,
-    {ok, LHC} = enet:start_host(LPort, [{peer_limit, 8}]),
-    RPort = 5002,
-    {ok, _RHC} = enet:start_host(RPort, [{peer_limit, 8}]),
-    {ok, LocalPeer} = enet:sync_connect_peer(LHC, "127.0.0.1", RPort),
+    {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}]),
+    {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}]),
+    {ok, LocalPeer} = enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002),
     RemotePeer =
         receive
             {enet, connect, remote, P} -> P
@@ -88,6 +80,6 @@ sync_connect_and_remote_disconnect_test() ->
     after 1000 ->
             exit(remote_peer_did_not_exit)
     end,
-    ok = enet:stop_host(LPort),
-    ok = enet:stop_host(RPort),
+    ok = enet:stop_host(5001),
+    ok = enet:stop_host(5002),
     ok.
