@@ -60,8 +60,8 @@ start_peer_controller(
 init([]) ->
     SupFlags = #{
       strategy => one_for_one,
-      intensity => 1,
-      period => 5
+      intensity => 0,
+      period => 1
      },
     {ok, {SupFlags, []}}.
 
