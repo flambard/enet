@@ -45,6 +45,16 @@ async_connect_and_local_disconnect_test() ->
     Ref2 = monitor(process, RemotePeer),
     ok = enet:disconnect_peer(LocalPeer),
     receive
+        {enet, disconnected, local} -> ok
+    after 1000 ->
+            exit(local_peer_did_not_notify_owner)
+    end,
+    receive
+        {enet, disconnected, remote} -> ok
+    after 1000 ->
+            exit(remote_peer_did_not_notify_owner)
+    end,
+    receive
         {'DOWN', Ref1, process, LocalPeer, normal} -> ok
     after 1000 ->
             exit(local_peer_did_not_exit)
@@ -71,6 +81,16 @@ sync_connect_and_remote_disconnect_test() ->
     Ref1 = monitor(process, LocalPeer),
     Ref2 = monitor(process, RemotePeer),
     ok = enet:disconnect_peer(RemotePeer),
+    receive
+        {enet, disconnected, local} -> ok
+    after 1000 ->
+            exit(local_peer_did_not_notify_owner)
+    end,
+    receive
+        {enet, disconnected, remote} -> ok
+    after 1000 ->
+            exit(remote_peer_did_not_notify_owner)
+    end,
     receive
         {'DOWN', Ref1, process, LocalPeer, normal} -> ok
     after 1000 ->

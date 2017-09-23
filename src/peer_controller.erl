@@ -343,9 +343,10 @@ connected({incoming_command, {_H, #disconnect{}}}, S) ->
     %%
     %% Received Disconnect command.
     %%
-    %% - TODO: Notify owner application?
+    %% - Notify owner application
     %% - Stop
     %%
+    S#state.owner ! {enet, disconnected, remote},
     {stop, normal, S};
 
 connected({outgoing_command,
@@ -398,9 +399,10 @@ disconnecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %% Received an Acknowledge command in the 'disconnecting' state.
     %%
     %% - Verify that the acknowledge is correct (TODO)
-    %% - TODO: Notify owner application?
+    %% - Notify owner application
     %% - Stop
     %%
+    S#state.owner ! {enet, disconnected, local},
     {stop, normal, S}.
 
 
