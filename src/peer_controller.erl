@@ -43,6 +43,9 @@
           port,
           remote_peer_id = undefined,
           peer_info,
+          incoming_bandwidth = 0,
+          outgoing_bandwidth = 0,
+          window_size = ?MAX_WINDOW_SIZE,
           packet_throttle_interval = ?PEER_PACKET_THROTTLE_INTERVAL,
           packet_throttle_acceleration = ?PEER_PACKET_THROTTLE_ACCELERATION,
           packet_throttle_deceleration = ?PEER_PACKET_THROTTLE_DECELERATION,
@@ -292,13 +295,31 @@ connected({incoming_command, {_H, #acknowledge{}}}, S) ->
     %%
     {next_state, connected, S};
 
-connected({incoming_command, {_H, #bandwidth_limit{}}}, S) ->
+connected({incoming_command, {_H, C = #bandwidth_limit{}}}, S) ->
     %%
     %% Received Bandwidth Limit command.
     %%
-    %% - TODO: Set bandwidth limit
+    %% - Set bandwidth limit
     %%
-    {next_state, connected, S};
+    #bandwidth_limit{
+       incoming_bandwidth = IncomingBandwidth,
+       outgoing_bandwidth = OutgoingBandwidth
+      } = C,
+    #state{ peer_info = #peer_info{ host_data = HostData }} = S,
+    HostOutgoingBandwidth = host_data:lookup(HostData, outgoing_bandwidth),
+    WSize =
+        case {IncomingBandwidth, HostOutgoingBandwidth} of
+            {0, 0} -> ?MAX_WINDOW_SIZE;
+            {0, H} -> ?MIN_WINDOW_SIZE *         H div ?PEER_WINDOW_SIZE_SCALE;
+            {P, 0} -> ?MIN_WINDOW_SIZE *         P div ?PEER_WINDOW_SIZE_SCALE;
+            {P, H} -> ?MIN_WINDOW_SIZE * min(P, H) div ?PEER_WINDOW_SIZE_SCALE
+        end,
+    NewS = S#state{
+             incoming_bandwidth = IncomingBandwidth,
+             outgoing_bandwidth = OutgoingBandwidth,
+             window_size = max(?MIN_WINDOW_SIZE, min(?MAX_WINDOW_SIZE, WSize))
+            },
+    {next_state, connected, NewS};
 
 connected({incoming_command, {_H, C = #throttle_configure{}}}, S) ->
     %%
