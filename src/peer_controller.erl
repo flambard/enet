@@ -300,13 +300,23 @@ connected({incoming_command, {_H, #bandwidth_limit{}}}, S) ->
     %%
     {next_state, connected, S};
 
-connected({incoming_command, {_H, #throttle_configure{}}}, S) ->
+connected({incoming_command, {_H, C = #throttle_configure{}}}, S) ->
     %%
     %% Received Throttle Configure command.
     %%
-    %% - TODO: Set throttle configuration
+    %% - Set throttle configuration
     %%
-    {next_state, connected, S};
+    #throttle_configure{
+       packet_throttle_interval = Interval,
+       packet_throttle_acceleration = Acceleration,
+       packet_throttle_deceleration = Deceleration
+      } = C,
+    NewS = S#state{
+             packet_throttle_interval = Interval,
+             packet_throttle_acceleration = Acceleration,
+             packet_throttle_deceleration = Deceleration
+            },
+    {next_state, connected, NewS};
 
 connected({incoming_command, {_H, #disconnect{}}}, S) ->
     %%
