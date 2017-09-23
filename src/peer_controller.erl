@@ -51,7 +51,8 @@
           packet_throttle_deceleration = ?PEER_PACKET_THROTTLE_DECELERATION,
           incoming_unsequenced_group = 0,
           outgoing_unsequenced_group = 0,
-          unsequenced_window = 0
+          unsequenced_window = 0,
+          connect_id
         }).
 
 
@@ -193,7 +194,8 @@ connecting(send_connect, S) ->
     CBin = wire_protocol_encode:command(ConnectC),
     {sent_time, _ConnectSentTime} =
         host_controller:send_outgoing_commands(Host, [HBin, CBin], IP, Port),
-    {next_state, connecting, S};
+    NewS = S#state{ connect_id = ConnectID },
+    {next_state, connecting, NewS};
 
 connecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %%
@@ -247,12 +249,41 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
     %% Received a Verify Connect command in the 'acknowledging_verify_connect'
     %% state.
     %%
-    %% - Verify that the data is correct (TODO)
+    %% - Verify that the data is correct
     %% - Add the remote peer ID to the Peer Table
     %% - Notify owner that we are connected
     %% - Change state to 'connected'
     %%
-    RemotePeerID = C#verify_connect.outgoing_peer_id,
+    #verify_connect{
+       outgoing_peer_id             = RemotePeerID,
+       incoming_session_id          = _IncomingSessionID,
+       outgoing_session_id          = _OutgoingSessionID,
+       mtu                          = _MTU,
+       window_size                  = WindowSize,
+       channel_count                = ChannelCount,
+       incoming_bandwidth           = IncomingBandwidth,
+       outgoing_bandwidth           = OutgoingBandwidth,
+       packet_throttle_interval     = ThrottleInterval,
+       packet_throttle_acceleration = ThrottleAcceleration,
+       packet_throttle_deceleration = ThrottleDecelaration,
+       connect_id                   = ConnectID
+      } = C,
+    #state{
+       window_size                  = WindowSize,
+       incoming_bandwidth           = IncomingBandwidth,
+       outgoing_bandwidth           = OutgoingBandwidth,
+       packet_throttle_interval     = ThrottleInterval,
+       packet_throttle_acceleration = ThrottleAcceleration,
+       packet_throttle_deceleration = ThrottleDecelaration,
+       connect_id                   = ConnectID
+      } = S,
+    %% TODO: Calculate and validate Session IDs
+    %% #peer_info{
+    %%    incoming_session_id = IncomingSessionID,
+    %%    outgoing_session_id = OutgoingSessionID
+    %%   } = S#state.peer_info,
+    ChannelCount = maps:size(S#state.channels),
+
     ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
     S#state.owner ! {enet, connect, local, self()},
     NewS = S#state{ remote_peer_id = RemotePeerID },
