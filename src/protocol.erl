@@ -10,6 +10,7 @@
          make_verify_connect_command/2,
          make_sequenced_disconnect_command/0,
          make_unsequenced_disconnect_command/0,
+         make_send_unsequenced_command/2,
          calculate_initial_window_size/1
         ]).
 
@@ -116,6 +117,17 @@ make_unsequenced_disconnect_command() ->
       #disconnect{}
     }.
 
+make_send_unsequenced_command(ChannelID, Data) ->
+    {
+      #command_header{
+         unsequenced = 1,
+         command = ?COMMAND_SEND_UNSEQUENCED,
+         channel_id = ChannelID
+        },
+      #send_unsequenced{
+         data = Data
+        }
+    }.
 
 %%%
 %%% Internal functions
