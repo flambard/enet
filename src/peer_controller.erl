@@ -9,7 +9,8 @@
 -export([
          start_link/8,
          disconnect/1,
-         recv_incoming_packet/3
+         recv_incoming_packet/3,
+         send_command/2
         ]).
 
 %% gen_fsm callbacks
@@ -123,6 +124,9 @@ disconnect(Peer) ->
 
 recv_incoming_packet(Peer, SentTime, Packet) ->
     gen_fsm:send_all_state_event(Peer, {incoming_packet, SentTime, Packet}).
+
+send_command(Peer, {H, C}) ->
+    gen_fsm:send_event(Peer, {outgoing_command, {H, C}}).
 
 
 %%%===================================================================
@@ -380,12 +384,7 @@ connected({incoming_command, {_H, #disconnect{}}}, S) ->
     S#state.owner ! {enet, disconnected, remote},
     {stop, normal, S};
 
-connected({outgoing_command,
-           {
-             H = #command_header{ unsequenced = 1 },
-             C = #send_unsequenced{}
-           }},
-          State) ->
+connected({outgoing_command, {H, C = #send_unsequenced{}}}, S) ->
     %%
     %% Sending an Unsequenced, unreliable command.
     %%
@@ -394,16 +393,16 @@ connected({outgoing_command,
     %% - Set unsequenced_group on command to outgoing_unsequenced_group
     %% - Queue the command for sending
     %%
-    #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = State,
-    NewGroup = State#state.outgoing_unsequenced_group + 1,
-    OutgoingCommand = C#send_unsequenced{ unsequenced_group = NewGroup },
+    #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = S,
+    Group = S#state.outgoing_unsequenced_group + 1,
+    C1 = C#send_unsequenced{ unsequenced_group = Group },
     HBin = wire_protocol_encode:command_header(H),
-    CBin = wire_protocol_encode:command(OutgoingCommand),
+    CBin = wire_protocol_encode:command(C1),
     {sent_time, _SentTime} =
         host_controller:send_outgoing_commands(
-          State#state.host, [HBin, CBin], IP, Port, RemotePeerID),
-    NewState = State#state{ outgoing_unsequenced_group = NewGroup },
-    {next_state, connected, NewState};
+          S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
+    NewS = S#state{ outgoing_unsequenced_group = Group },
+    {next_state, connected, NewS};
 
 connected(disconnect, State) ->
     %%

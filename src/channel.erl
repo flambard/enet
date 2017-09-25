@@ -5,8 +5,8 @@
 -export([
          start_link/3,
          stop/1,
-         incoming/2,
-         outgoing/2
+         recv_unsequenced/2,
+         send_unsequenced/2
         ]).
 
 -export([
@@ -37,14 +37,14 @@ start_link(ID, Peer, Owner) ->
 stop(Channel) ->
     Channel ! stop.
 
-incoming(Channel, Packet) ->
+recv_unsequenced(Channel, {H, C}) ->
     %% Peer -> Channel -> Owner
-    Channel ! {incoming, Packet},
+    Channel ! {recv_unsequenced, {H, C}},
     ok.
 
-outgoing(Channel, Packet) ->
+send_unsequenced(Channel, Data) ->
     %% Owner -> Channel -> Peer
-    Channel ! {outgoing, Packet},
+    Channel ! {send_unsequenced, Data},
     ok.
 
 
@@ -58,15 +58,17 @@ init(ID, Peer, Owner) ->
     loop(State).
 
 
-loop(State = #state{peer = Peer, owner = Owner}) ->
+loop(State = #state{ id = ID, peer = Peer, owner = Owner }) ->
     receive
-        {incoming, Packet} ->
-            %% Send packet to owner
-            Owner ! {enet, Packet},
+        {recv_unsequenced, {
+           #command_header{ unsequenced = 1 },
+           C = #send_unsequenced{}
+          }} ->
+            Owner ! {enet, ID, C},
             loop(State);
-        {outgoing, Packet} ->
-            %% Send packet to peer controller
-            peer_controller:outgoing(Peer, Packet),
+        {send_unsequenced, Data} ->
+            {H, C} = protocol:make_send_unsequenced_command(ID, Data),
+            ok = peer_controller:send_command(Peer, {H, C}),
             loop(State);
         stop ->
             stopped;
