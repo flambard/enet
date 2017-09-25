@@ -6,7 +6,9 @@
          start_link/3,
          stop/1,
          recv_unsequenced/2,
-         send_unsequenced/2
+         send_unsequenced/2,
+         recv_unreliable/2,
+         send_unreliable/2
         ]).
 
 -export([
@@ -47,6 +49,16 @@ send_unsequenced(Channel, Data) ->
     Channel ! {send_unsequenced, Data},
     ok.
 
+recv_unreliable(Channel, {H, C}) ->
+    %% Peer -> Channel -> Owner
+    Channel ! {recv_unsequenced, {H, C}},
+    ok.
+
+send_unreliable(Channel, Data) ->
+    %% Owner -> Channel -> Peer
+    Channel ! {send_unsequenced, Data},
+    ok.
+
 
 %%%
 %%% Implementation
@@ -58,21 +70,33 @@ init(ID, Peer, Owner) ->
     loop(State).
 
 
-loop(State = #state{ id = ID, peer = Peer, owner = Owner }) ->
+loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
     receive
         {recv_unsequenced, {
            #command_header{ unsequenced = 1 },
            C = #send_unsequenced{}
           }} ->
             Owner ! {enet, ID, C},
-            loop(State);
+            loop(S);
         {send_unsequenced, Data} ->
             {H, C} = protocol:make_send_unsequenced_command(ID, Data),
             ok = peer_controller:send_command(Peer, {H, C}),
-            loop(State);
+            loop(S);
+        {recv_unreliable, {
+           #command_header{},
+           C = #send_unreliable{ unreliable_sequence_number = _N }
+          }} ->
+            Owner ! {enet, ID, C},
+            loop(S);
+        {send_unreliable, Data} ->
+            SeqNumber = S#state.outgoing_unreliable_sequence_number + 1,
+            {H, C} = protocol:make_send_unreliable_command(ID, SeqNumber, Data),
+            ok = peer_controller:send_command(Peer, {H, C}),
+            NewS = S#state{ outgoing_unreliable_sequence_number = SeqNumber },
+            loop(NewS);
         stop ->
             stopped;
         Msg ->
             io:format("Received unexpected message: ~p~n", [Msg]),
-            loop(State)
+            loop(S)
     end.

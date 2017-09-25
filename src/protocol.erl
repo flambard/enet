@@ -11,6 +11,7 @@
          make_sequenced_disconnect_command/0,
          make_unsequenced_disconnect_command/0,
          make_send_unsequenced_command/2,
+         make_send_unreliable_command/3,
          calculate_initial_window_size/1
         ]).
 
@@ -128,6 +129,19 @@ make_send_unsequenced_command(ChannelID, Data) ->
          data = Data
         }
     }.
+
+make_send_unreliable_command(ChannelID, UnreliableSequenceNumber, Data) ->
+    {
+      #command_header{
+         command = ?COMMAND_SEND_UNRELIABLE,
+         channel_id = ChannelID
+        },
+      #send_unreliable{
+         unreliable_sequence_number = UnreliableSequenceNumber,
+         data = Data
+        }
+    }.
+
 
 %%%
 %%% Internal functions
