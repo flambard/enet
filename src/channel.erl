@@ -96,31 +96,35 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
             loop(S);
         {recv_unreliable, {
            #command_header{},
-           C = #send_unreliable{ unreliable_sequence_number = _N }
+           C = #send_unreliable{ unreliable_sequence_number = N }
           }} ->
-            Owner ! {enet, ID, C},
-            loop(S);
+            if N =< S#state.incoming_unreliable_sequence_number ->
+                    %% Data is old - drop it and continue.
+                    loop(S);
+               true ->
+                    Owner ! {enet, ID, C},
+                    NewS = S#state{ incoming_unreliable_sequence_number = N },
+                    loop(NewS)
+            end;
         {send_unreliable, Data} ->
-            SeqNumber = S#state.outgoing_unreliable_sequence_number + 1,
-            {H, C} = protocol:make_send_unreliable_command(ID, SeqNumber, Data),
+            N = S#state.outgoing_unreliable_sequence_number,
+            {H, C} = protocol:make_send_unreliable_command(ID, N, Data),
             ok = peer_controller:send_command(Peer, {H, C}),
-            NewS = S#state{ outgoing_unreliable_sequence_number = SeqNumber },
+            NewS = S#state{ outgoing_unreliable_sequence_number = N + 1 },
             loop(NewS);
         {recv_reliable, {
-           #command_header{},
+           #command_header{ reliable_sequence_number = N },
            C = #send_reliable{}
-          }} ->
+          }} when N =:= S#state.incoming_reliable_sequence_number ->
             Owner ! {enet, ID, C},
-            loop(S);
+            NewS = S#state{ incoming_reliable_sequence_number = N + 1 },
+            loop(NewS);
         {send_reliable, Data} ->
-            SeqNumber = S#state.outgoing_reliable_sequence_number + 1,
-            {H, C} = protocol:make_send_reliable_command(ID, SeqNumber, Data),
+            N = S#state.outgoing_reliable_sequence_number,
+            {H, C} = protocol:make_send_reliable_command(ID, N, Data),
             ok = peer_controller:send_command(Peer, {H, C}),
-            NewS = S#state{ outgoing_reliable_sequence_number = SeqNumber },
+            NewS = S#state{ outgoing_reliable_sequence_number = N + 1 },
             loop(NewS);
         stop ->
-            stopped;
-        Msg ->
-            io:format("Received unexpected message: ~p~n", [Msg]),
-            loop(S)
+            stopped
     end.

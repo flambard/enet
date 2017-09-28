@@ -150,15 +150,27 @@ unreliable_messages_test() ->
         end,
     {ok, LocalChannel1}  = maps:find(0, LocalChannels),
     {ok, RemoteChannel1} = maps:find(0, RemoteChannels),
-    ok = enet:send_unreliable(LocalChannel1, <<"local->remote">>),
-    ok = enet:send_unreliable(RemoteChannel1, <<"remote->local">>),
+    ok = enet:send_unreliable(LocalChannel1, <<"local->remote 1">>),
+    ok = enet:send_unreliable(RemoteChannel1, <<"remote->local 1">>),
+    ok = enet:send_unreliable(LocalChannel1, <<"local->remote 2">>),
+    ok = enet:send_unreliable(RemoteChannel1, <<"remote->local 2">>),
     receive
-        {enet, 0, #send_unreliable{ data = <<"local->remote">> }} -> ok
+        {enet, 0, #send_unreliable{ data = <<"local->remote 1">> }} -> ok
     after 500 ->
             exit(remote_channel_did_not_send_data_to_owner)
     end,
     receive
-        {enet, 0, #send_unreliable{ data = <<"remote->local">> }} -> ok
+        {enet, 0, #send_unreliable{ data = <<"remote->local 1">> }} -> ok
+    after 500 ->
+            exit(local_channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #send_unreliable{ data = <<"local->remote 2">> }} -> ok
+    after 500 ->
+            exit(remote_channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #send_unreliable{ data = <<"remote->local 2">> }} -> ok
     after 500 ->
             exit(local_channel_did_not_send_data_to_owner)
     end,
@@ -179,15 +191,27 @@ reliable_messages_test() ->
         end,
     {ok, LocalChannel1}  = maps:find(0, LocalChannels),
     {ok, RemoteChannel1} = maps:find(0, RemoteChannels),
-    ok = enet:send_reliable(LocalChannel1, <<"local->remote">>),
-    ok = enet:send_reliable(RemoteChannel1, <<"remote->local">>),
+    ok = enet:send_reliable(LocalChannel1, <<"local->remote 1">>),
+    ok = enet:send_reliable(RemoteChannel1, <<"remote->local 1">>),
+    ok = enet:send_reliable(LocalChannel1, <<"local->remote 2">>),
+    ok = enet:send_reliable(RemoteChannel1, <<"remote->local 2">>),
     receive
-        {enet, 0, #send_reliable{ data = <<"local->remote">> }} -> ok
+        {enet, 0, #send_reliable{ data = <<"local->remote 1">> }} -> ok
     after 500 ->
             exit(remote_channel_did_not_send_data_to_owner)
     end,
     receive
-        {enet, 0, #send_reliable{ data = <<"remote->local">> }} -> ok
+        {enet, 0, #send_reliable{ data = <<"remote->local 1">> }} -> ok
+    after 500 ->
+            exit(local_channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #send_reliable{ data = <<"local->remote 2">> }} -> ok
+    after 500 ->
+            exit(remote_channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #send_reliable{ data = <<"remote->local 2">> }} -> ok
     after 500 ->
             exit(local_channel_did_not_send_data_to_owner)
     end,
