@@ -5,7 +5,10 @@
          stop_host/1,
          connect_peer/4,
          sync_connect_peer/4,
-         disconnect_peer/1
+         disconnect_peer/1,
+         send_unsequenced/2,
+         send_unreliable/2,
+         send_reliable/2
         ]).
 
 
@@ -26,3 +29,13 @@ sync_connect_peer(Host, IP, Port, ChannelCount) ->
 
 disconnect_peer(Peer) ->
     peer_controller:disconnect(Peer).
+
+
+send_unsequenced(Channel, Data) ->
+    channel:send_unsequenced(Channel, Data).
+
+send_unreliable(Channel, Data) ->
+    channel:send_unreliable(Channel, Data).
+
+send_reliable(Channel, Data) ->
+    channel:send_reliable(Channel, Data).

@@ -12,6 +12,7 @@
          make_unsequenced_disconnect_command/0,
          make_send_unsequenced_command/2,
          make_send_unreliable_command/3,
+         make_send_reliable_command/3,
          calculate_initial_window_size/1
         ]).
 
@@ -138,6 +139,18 @@ make_send_unreliable_command(ChannelID, UnreliableSequenceNumber, Data) ->
         },
       #send_unreliable{
          unreliable_sequence_number = UnreliableSequenceNumber,
+         data = Data
+        }
+    }.
+
+make_send_reliable_command(ChannelID, ReliableSequenceNumber, Data) ->
+    {
+      #command_header{
+         command = ?COMMAND_SEND_RELIABLE,
+         channel_id = ChannelID,
+         reliable_sequence_number = ReliableSequenceNumber
+        },
+      #send_reliable{
          data = Data
         }
     }.

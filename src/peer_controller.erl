@@ -9,6 +9,7 @@
 -export([
          start_link/8,
          disconnect/1,
+         channels/1,
          recv_incoming_packet/3,
          send_command/2
         ]).
@@ -121,6 +122,9 @@ start_link(remote, Host, ChannelSup, N, PeerInfo, IP, Port, Owner) ->
 
 disconnect(Peer) ->
     gen_fsm:send_event(Peer, disconnect).
+
+channels(Peer) ->
+    gen_fsm:sync_send_all_state_event(Peer, channels).
 
 recv_incoming_packet(Peer, SentTime, Packet) ->
     gen_fsm:send_all_state_event(Peer, {incoming_packet, SentTime, Packet}).
@@ -289,7 +293,7 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
     ChannelCount = maps:size(S#state.channels),
 
     ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
-    S#state.owner ! {enet, connect, local, self()},
+    S#state.owner ! {enet, connect, local, {self(), S#state.channels}},
     NewS = S#state{ remote_peer_id = RemotePeerID },
     {next_state, connected, NewS}.
 
@@ -306,7 +310,7 @@ verifying_connect({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %% - Notify owner that a new peer has been connected
     %% - Change to 'connected' state
     %%
-    S#state.owner ! {enet, connect, remote, self()},
+    S#state.owner ! {enet, connect, remote, {self(), S#state.channels}},
     {next_state, connected, S}.
 
 
@@ -374,6 +378,39 @@ connected({incoming_command, {_H, C = #throttle_configure{}}}, S) ->
             },
     {next_state, connected, NewS};
 
+connected({incoming_command, {H, C = #send_unsequenced{}}}, S) ->
+    %%
+    %% Received Send Unsequenced command.
+    %%
+    %% TOOD: Describe.
+    %%
+    #command_header{ channel_id = ChannelID } = H,
+    #state{ channels = #{ ChannelID := Channel } } = S,
+    ok = channel:recv_unsequenced(Channel, {H, C}),
+    {next_state, connected, S};
+
+connected({incoming_command, {H, C = #send_unreliable{}}}, S) ->
+    %%
+    %% Received Send Unreliable command.
+    %%
+    %% TOOD: Describe.
+    %%
+    #command_header{ channel_id = ChannelID } = H,
+    #state{ channels = #{ ChannelID := Channel } } = S,
+    ok = channel:recv_unreliable(Channel, {H, C}),
+    {next_state, connected, S};
+
+connected({incoming_command, {H, C = #send_reliable{}}}, S) ->
+    %%
+    %% Received Send Reliable command.
+    %%
+    %% TOOD: Describe.
+    %%
+    #command_header{ channel_id = ChannelID } = H,
+    #state{ channels = #{ ChannelID := Channel } } = S,
+    ok = channel:recv_reliable(Channel, {H, C}),
+    {next_state, connected, S};
+
 connected({incoming_command, {_H, #disconnect{}}}, S) ->
     %%
     %% Received Disconnect command.
@@ -403,6 +440,34 @@ connected({outgoing_command, {H, C = #send_unsequenced{}}}, S) ->
           S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
     NewS = S#state{ outgoing_unsequenced_group = Group },
     {next_state, connected, NewS};
+
+connected({outgoing_command, {H, C = #send_unreliable{}}}, S) ->
+    %%
+    %% Sending a Sequenced, unreliable command.
+    %%
+    %% TODO: Describe.
+    %%
+    #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = S,
+    HBin = wire_protocol_encode:command_header(H),
+    CBin = wire_protocol_encode:command(C),
+    {sent_time, _SentTime} =
+        host_controller:send_outgoing_commands(
+          S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
+    {next_state, connected, S};
+
+connected({outgoing_command, {H, C = #send_reliable{}}}, S) ->
+    %%
+    %% Sending a Sequenced, reliable command.
+    %%
+    %% TODO: Describe.
+    %%
+    #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = S,
+    HBin = wire_protocol_encode:command_header(H),
+    CBin = wire_protocol_encode:command(C),
+    {sent_time, _SentTime} =
+        host_controller:send_outgoing_commands(
+          S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
+    {next_state, connected, S};
 
 connected(disconnect, State) ->
     %%
@@ -487,8 +552,8 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
 %%% handle_sync_event
 %%%
 
-handle_sync_event(_Event, _From, _StateName, State) ->
-    {stop, unexpected_event, State}.
+handle_sync_event(channels, _From, StateName, S) ->
+    {reply, S#state.channels, StateName, S}.
 
 
 %%%

@@ -61,10 +61,10 @@ connect(Host, IP, Port, ChannelCount) ->
 sync_connect(Host, IP, Port, ChannelCount) ->
     case gen_server:call(Host, {connect, IP, Port, ChannelCount, self()}) of
         {error, Reason} -> {error, Reason};
-        {ok, Pid} ->
+        {ok, Peer} ->
             receive
-                {enet, connect, local, Pid} ->
-                    {ok, Pid}
+                {enet, connect, local, {Peer, Channels}} ->
+                    {ok, {Peer, Channels}}
             after 1000 ->
                     {error, timeout}
             end
