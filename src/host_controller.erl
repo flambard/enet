@@ -227,8 +227,9 @@ handle_info({'DOWN', _Ref, process, Pid, Reason}, S) ->
     %% - Send an unsequenced Disconnect message if the peer exited abnormally
     %%
     case peer_table:take(S#state.peer_table, Pid) of
-        not_found                    -> ok;
-        _Peer when Reason =:= normal -> ok;
+        not_found                      -> ok;
+        _Peer when Reason =:= normal   -> ok;
+        #peer{ remote_id = undefined } -> ok;
         #peer{ remote_id = PeerID, ip = IP, port = Port } ->
             PH = #protocol_header{
                     peer_id = PeerID,
