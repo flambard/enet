@@ -276,26 +276,31 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
        packet_throttle_deceleration = ThrottleDecelaration,
        connect_id                   = ConnectID
       } = C,
-    #state{
-       window_size                  = WindowSize,
-       incoming_bandwidth           = IncomingBandwidth,
-       outgoing_bandwidth           = OutgoingBandwidth,
-       packet_throttle_interval     = ThrottleInterval,
-       packet_throttle_acceleration = ThrottleAcceleration,
-       packet_throttle_deceleration = ThrottleDecelaration,
-       connect_id                   = ConnectID
-      } = S,
     %% TODO: Calculate and validate Session IDs
     %% #peer_info{
     %%    incoming_session_id = IncomingSessionID,
     %%    outgoing_session_id = OutgoingSessionID
     %%   } = S#state.peer_info,
-    ChannelCount = maps:size(S#state.channels),
-
-    ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
-    S#state.owner ! {enet, connect, local, {self(), S#state.channels}},
-    NewS = S#state{ remote_peer_id = RemotePeerID },
-    {next_state, connected, NewS}.
+    case {maps:size(S#state.channels), S} of
+        {
+          ChannelCount,
+          #state{
+             window_size                  = WindowSize,
+             incoming_bandwidth           = IncomingBandwidth,
+             outgoing_bandwidth           = OutgoingBandwidth,
+             packet_throttle_interval     = ThrottleInterval,
+             packet_throttle_acceleration = ThrottleAcceleration,
+             packet_throttle_deceleration = ThrottleDecelaration,
+             connect_id                   = ConnectID
+            }
+        } ->
+            ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
+            S#state.owner ! {enet, connect, local, {self(), S#state.channels}},
+            NewS = S#state{ remote_peer_id = RemotePeerID },
+            {next_state, connected, NewS};
+        _Mismatch ->
+            {stop, connect_verification_failed, S}
+    end.
 
 
 %%%
