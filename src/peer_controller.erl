@@ -171,7 +171,7 @@ init({remote_connect, Host, ChannelSup, _N, PeerInfo, IP, Port, Owner}) ->
            port = Port,
            peer_info = PeerInfo
           },
-    {ok, acknowledging_connect, S}.
+    {ok, acknowledging_connect, S, ?PEER_TIMEOUT_MINIMUM}.
 
 
 %%%
@@ -203,7 +203,7 @@ connecting(send_connect, S) ->
     {sent_time, _ConnectSentTime} =
         host_controller:send_outgoing_commands(Host, [HBin, CBin], IP, Port),
     NewS = S#state{ connect_id = ConnectID },
-    {next_state, connecting, NewS};
+    {next_state, connecting, NewS, ?PEER_TIMEOUT_MINIMUM};
 
 connecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %%
@@ -212,7 +212,7 @@ connecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %% - Verify that the acknowledge is correct (TODO)
     %% - Change state to 'acknowledging_verify_connect'
     %%
-    {next_state, acknowledging_verify_connect, S}.
+    {next_state, acknowledging_verify_connect, S, ?PEER_TIMEOUT_MINIMUM}.
 
 
 %%%
@@ -245,7 +245,7 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
     Channels = start_channels(ChannelSup, C#connect.channel_count, Owner),
     NewS = S#state{ remote_peer_id = RemotePeerID, channels = Channels },
-    {next_state, verifying_connect, NewS}.
+    {next_state, verifying_connect, NewS, ?PEER_TIMEOUT_MINIMUM}.
 
 
 %%%
