@@ -247,8 +247,8 @@ handle_info({'DOWN', _Ref, process, Pid, Reason}, S) ->
 %%% terminate
 %%%
 
-terminate(_Reason, _State) ->
-    ok.
+terminate(_Reason, S) ->
+    ok = gen_udp:close(S#state.socket).
 
 
 %%%
