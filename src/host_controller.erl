@@ -85,7 +85,6 @@ send_outgoing_commands(Host, Commands, IP, Port, PeerID) ->
 %%%===================================================================
 
 init({Owner, Port, PeerSup, Options}) ->
-    process_flag(trap_exit, true),
     PeerLimit =
         case lists:keyfind(peer_limit, 1, Options) of
             {peer_limit, PLimit} -> PLimit;
