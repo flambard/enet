@@ -15,7 +15,12 @@
 start_host(Port, Options) ->
     {ok, HostSup} = enet_sup:start_host_supervisor(Port),
     {ok, PeerSup} = host_sup:start_peer_supervisor(HostSup),
-    host_sup:start_host_controller(HostSup, Port, PeerSup, Options).
+    case host_sup:start_host_controller(HostSup, Port, PeerSup, Options) of
+        {ok, HostController} -> {ok, HostController};
+        {error, Reason} ->
+            ok = enet_sup:stop_host_supervisor(Port),
+            {error, Reason}
+    end.
 
 stop_host(Port) ->
     enet_sup:stop_host_supervisor(Port).
