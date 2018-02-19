@@ -145,6 +145,7 @@ init({local_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner}) ->
     %% - Start in the 'connecting' state
     %%
     Channels = start_channels(ChannelSup, N, Owner),
+    <<ConnectID:32>> = crypto:strong_rand_bytes(4),
     ok = gen_fsm:send_event(self(), send_connect),
     S = #state{
            owner = Owner,
@@ -154,7 +155,8 @@ init({local_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner}) ->
            host_data = PeerInfo#peer_info.host_data,
            ip = IP,
            port = Port,
-           peer_info = PeerInfo
+           peer_info = PeerInfo,
+           connect_id = ConnectID
           },
     {ok, connecting, S};
 
@@ -187,9 +189,9 @@ connecting(send_connect, S) ->
        channels = Channels,
        ip = IP,
        port = Port,
-       peer_info = PeerInfo
+       peer_info = PeerInfo,
+       connect_id = ConnectID
       } = S,
-    <<ConnectID:32>> = crypto:strong_rand_bytes(4),
     {ConnectH, ConnectC} =
         protocol:make_connect_command(
           PeerInfo,
@@ -202,8 +204,7 @@ connecting(send_connect, S) ->
     CBin = wire_protocol_encode:command(ConnectC),
     {sent_time, _ConnectSentTime} =
         host_controller:send_outgoing_commands(Host, [HBin, CBin], IP, Port),
-    NewS = S#state{ connect_id = ConnectID },
-    {next_state, connecting, NewS, ?PEER_TIMEOUT_MINIMUM};
+    {next_state, connecting, S, ?PEER_TIMEOUT_MINIMUM};
 
 connecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %%
