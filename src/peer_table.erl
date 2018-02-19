@@ -44,7 +44,7 @@ take(Table, PeerPid) ->
     case ets:match_object(Table, #peer{ pid = PeerPid, _ = '_'}) of
         []     -> not_found;
         [Peer] ->
-            true = ets:delete_object(Table, Peer),
+            true = ets:insert(Table, #peer{ id = Peer#peer.id }),
             Peer
     end.
 
