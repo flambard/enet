@@ -26,7 +26,7 @@ start_host_supervisor(ID) ->
       id => ID,
       start => {host_sup, start_link, []},
       restart => temporary,
-      shutdown => 5000,
+      shutdown => infinity,
       type => supervisor,
       modules => [host_sup]
      },

@@ -30,7 +30,7 @@ start_channel_supervisor(Supervisor) ->
         []
        },
       restart => permanent,
-      shutdown => 1000,
+      shutdown => infinity,
       type => supervisor,
       modules => [channel_sup]
      },

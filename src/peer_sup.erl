@@ -29,7 +29,7 @@ start_peer_channel_supervisor(Supervisor, ID) ->
         []
        },
       restart => temporary,
-      shutdown => 1000,
+      shutdown => infinity,
       type => supervisor,
       modules => [peer_channel_sup]
      },

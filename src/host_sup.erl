@@ -28,7 +28,7 @@ start_peer_supervisor(Supervisor) ->
         []
        },
       restart => permanent,
-      shutdown => 3000,
+      shutdown => infinity,
       type => supervisor,
       modules => [peer_sup]
      },
