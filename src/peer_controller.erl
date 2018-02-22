@@ -10,6 +10,7 @@
          start_link/8,
          disconnect/1,
          channels/1,
+         get_connect_id/1,
          recv_incoming_packet/3,
          send_command/2
         ]).
@@ -125,6 +126,9 @@ disconnect(Peer) ->
 
 channels(Peer) ->
     gen_fsm:sync_send_all_state_event(Peer, channels).
+
+get_connect_id(Peer) ->
+    gen_fsm:sync_send_all_state_event(Peer, connect_id).
 
 recv_incoming_packet(Peer, SentTime, Packet) ->
     gen_fsm:send_all_state_event(Peer, {incoming_packet, SentTime, Packet}).
@@ -559,7 +563,10 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
 %%%
 
 handle_sync_event(channels, _From, StateName, S) ->
-    {reply, S#state.channels, StateName, S}.
+    {reply, S#state.channels, StateName, S};
+
+handle_sync_event(connect_id, _From, StateName, S) ->
+    {reply, S#state.connect_id, StateName, S}.
 
 
 %%%
