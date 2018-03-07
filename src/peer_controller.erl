@@ -232,6 +232,21 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     %% - Send a VerifyConnect command (use peer ID)
     %% - Start in the 'verifying_connect' state
     %%
+    #connect{
+       outgoing_peer_id             = RemotePeerID,
+       incoming_session_id          = _IncomingSessionID,
+       outgoing_session_id          = _OutgoingSessionID,
+       mtu                          = _MTU,
+       window_size                  = WindowSize,
+       channel_count                = ChannelCount,
+       incoming_bandwidth           = IncomingBandwidth,
+       outgoing_bandwidth           = OutgoingBandwidth,
+       packet_throttle_interval     = PacketThrottleInterval,
+       packet_throttle_acceleration = PacketThrottleAcceleration,
+       packet_throttle_deceleration = PacketThrottleDeceleration,
+       connect_id                   = ConnectID,
+       data                         = _Data
+      } = C,
     #state{
        owner = Owner,
        host = Host,
@@ -240,7 +255,6 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
        port = Port,
        peer_info = PeerInfo
       } = S,
-    RemotePeerID = C#connect.outgoing_peer_id,
     {VCH, VCC} = protocol:make_verify_connect_command(C, PeerInfo),
     HBin = wire_protocol_encode:command_header(VCH),
     CBin = wire_protocol_encode:command(VCC),
@@ -248,8 +262,18 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
         host_controller:send_outgoing_commands(
           Host, [HBin, CBin], IP, Port, RemotePeerID),
     ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
-    Channels = start_channels(ChannelSup, C#connect.channel_count, Owner),
-    NewS = S#state{ remote_peer_id = RemotePeerID, channels = Channels },
+    Channels = start_channels(ChannelSup, ChannelCount, Owner),
+    NewS = S#state{
+             remote_peer_id = RemotePeerID,
+             channels = Channels,
+             connect_id = ConnectID,
+             incoming_bandwidth = IncomingBandwidth,
+             outgoing_bandwidth = OutgoingBandwidth,
+             window_size = WindowSize,
+             packet_throttle_interval = PacketThrottleInterval,
+             packet_throttle_acceleration = PacketThrottleAcceleration,
+             packet_throttle_deceleration = PacketThrottleDeceleration
+            },
     {next_state, verifying_connect, NewS, ?PEER_TIMEOUT_MINIMUM}.
 
 
