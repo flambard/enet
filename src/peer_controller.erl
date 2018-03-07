@@ -460,7 +460,7 @@ connected({incoming_command, {_H, #disconnect{}}}, S) ->
     %% - Notify owner application
     %% - Stop
     %%
-    S#state.owner ! {enet, disconnected, remote},
+    S#state.owner ! {enet, disconnected, remote, self(), S#state.connect_id},
     {stop, normal, S};
 
 connected({outgoing_command, {H, C = #send_unsequenced{}}}, S) ->
@@ -539,7 +539,7 @@ disconnecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %% - Notify owner application
     %% - Stop
     %%
-    S#state.owner ! {enet, disconnected, local},
+    S#state.owner ! {enet, disconnected, local, self(), S#state.connect_id},
     {stop, normal, S}.
 
 
