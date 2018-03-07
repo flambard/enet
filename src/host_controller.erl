@@ -63,7 +63,7 @@ sync_connect(Host, IP, Port, ChannelCount) ->
         {error, Reason} -> {error, Reason};
         {ok, Peer} ->
             receive
-                {enet, connect, local, {Peer, Channels}} ->
+                {enet, connect, local, {Peer, Channels}, _ConnectID} ->
                     {ok, {Peer, Channels}}
             after 1000 ->
                     {error, timeout}

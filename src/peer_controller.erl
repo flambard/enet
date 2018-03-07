@@ -314,6 +314,9 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
         {
           ChannelCount,
           #state{
+             owner                        = Owner,
+             host                         = Host,
+             channels                     = Channels,
              window_size                  = WindowSize,
              incoming_bandwidth           = IncomingBandwidth,
              outgoing_bandwidth           = OutgoingBandwidth,
@@ -323,8 +326,8 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
              connect_id                   = ConnectID
             }
         } ->
-            ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
-            S#state.owner ! {enet, connect, local, {self(), S#state.channels}},
+            ok = host_controller:set_remote_peer_id(Host, RemotePeerID),
+            Owner ! {enet, connect, local, {self(), Channels}, ConnectID},
             NewS = S#state{ remote_peer_id = RemotePeerID },
             {next_state, connected, NewS};
         _Mismatch ->
@@ -344,7 +347,12 @@ verifying_connect({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %% - Notify owner that a new peer has been connected
     %% - Change to 'connected' state
     %%
-    S#state.owner ! {enet, connect, remote, {self(), S#state.channels}},
+    #state{
+       owner = Owner,
+       channels = Channels,
+       connect_id = ConnectID
+      } = S,
+    Owner ! {enet, connect, remote, {self(), Channels}, ConnectID},
     {next_state, connected, S}.
 
 
