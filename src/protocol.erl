@@ -12,8 +12,7 @@
          make_unsequenced_disconnect_command/0,
          make_send_unsequenced_command/2,
          make_send_unreliable_command/3,
-         make_send_reliable_command/3,
-         calculate_initial_window_size/1
+         make_send_reliable_command/3
         ]).
 
 
@@ -39,7 +38,7 @@ make_connect_command(PeerInfo = #peer_info{},
     HostData = PeerInfo#peer_info.host_data,
     IncomingBandwidth = host_data:lookup(HostData, incoming_bandwidth),
     OutgoingBandwidth = host_data:lookup(HostData, outgoing_bandwidth),
-    WindowSize = protocol:calculate_initial_window_size(OutgoingBandwidth),
+    WindowSize = calculate_initial_window_size(OutgoingBandwidth),
     {
       #command_header{
          command = ?COMMAND_CONNECT,
