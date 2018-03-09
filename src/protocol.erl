@@ -6,8 +6,8 @@
 
 -export([
          make_acknowledge_command/2,
-         make_connect_command/6,
-         make_verify_connect_command/2,
+         make_connect_command/9,
+         make_verify_connect_command/5,
          make_sequenced_disconnect_command/0,
          make_unsequenced_disconnect_command/0,
          make_send_unsequenced_command/2,
@@ -31,13 +31,13 @@ make_acknowledge_command(H = #command_header{}, SentTime) ->
 
 make_connect_command(PeerInfo = #peer_info{},
                      ChannelCount,
+                     MTU,
+                     IncomingBandwidth,
+                     OutgoingBandwidth,
                      PacketThrottleInterval,
                      PacketThrottleAcceleration,
                      PacketThrottleDeceleration,
                      ConnectID) ->
-    HostData = PeerInfo#peer_info.host_data,
-    IncomingBandwidth = host_data:lookup(HostData, incoming_bandwidth),
-    OutgoingBandwidth = host_data:lookup(HostData, outgoing_bandwidth),
     WindowSize = calculate_initial_window_size(OutgoingBandwidth),
     {
       #command_header{
@@ -45,29 +45,29 @@ make_connect_command(PeerInfo = #peer_info{},
          channel_id = 16#FF,
          please_acknowledge = 1
         },
-      #connect
-      { outgoing_peer_id = PeerInfo#peer_info.id
-      , incoming_session_id = PeerInfo#peer_info.incoming_session_id
-      , outgoing_session_id = PeerInfo#peer_info.outgoing_session_id
-      , mtu = host_data:lookup(HostData, mtu)
-      , window_size = WindowSize
-      , channel_count = ChannelCount
-      , incoming_bandwidth = IncomingBandwidth
-      , outgoing_bandwidth = OutgoingBandwidth
-      , packet_throttle_interval = PacketThrottleInterval
-      , packet_throttle_acceleration = PacketThrottleAcceleration
-      , packet_throttle_deceleration = PacketThrottleDeceleration
-      , connect_id = ConnectID
-      , data = 0 %% What is this used for?
-      }
+      #connect{
+         outgoing_peer_id = PeerInfo#peer_info.id,
+         incoming_session_id = PeerInfo#peer_info.incoming_session_id,
+         outgoing_session_id = PeerInfo#peer_info.outgoing_session_id,
+         mtu = MTU,
+         window_size = WindowSize,
+         channel_count = ChannelCount,
+         incoming_bandwidth = IncomingBandwidth,
+         outgoing_bandwidth = OutgoingBandwidth,
+         packet_throttle_interval = PacketThrottleInterval,
+         packet_throttle_acceleration = PacketThrottleAcceleration,
+         packet_throttle_deceleration = PacketThrottleDeceleration,
+         connect_id = ConnectID,
+         data = 0 %% What is this used for?
+        }
     }.
 
 
-make_verify_connect_command(C = #connect{}, PeerInfo = #peer_info{}) ->
-    HostData = PeerInfo#peer_info.host_data,
-    HostChannelLimit = host_data:lookup(HostData, channel_limit),
-    IncomingBandwidth = host_data:lookup(HostData, incoming_bandwidth),
-    OutgoingBandwidth = host_data:lookup(HostData, outgoing_bandwidth),
+make_verify_connect_command(C = #connect{},
+                            PeerInfo = #peer_info{},
+                            HostChannelLimit,
+                            IncomingBandwidth,
+                            OutgoingBandwidth) ->
     WindowSize =
         calculate_window_size(IncomingBandwidth, C#connect.window_size),
     IncomingSessionID =
@@ -82,20 +82,20 @@ make_verify_connect_command(C = #connect{}, PeerInfo = #peer_info{}) ->
          channel_id = 16#FF,
          please_acknowledge = 1
         },
-      #verify_connect
-      { outgoing_peer_id = PeerInfo#peer_info.id
-      , incoming_session_id = IncomingSessionID
-      , outgoing_session_id = OutgoingSessionID
-      , mtu = clamp(C#connect.mtu, ?MAX_MTU, ?MIN_MTU)
-      , window_size = WindowSize
-      , channel_count = min(C#connect.channel_count, HostChannelLimit)
-      , incoming_bandwidth = IncomingBandwidth
-      , outgoing_bandwidth = OutgoingBandwidth
-      , packet_throttle_interval = C#connect.packet_throttle_interval
-      , packet_throttle_acceleration = C#connect.packet_throttle_acceleration
-      , packet_throttle_deceleration = C#connect.packet_throttle_deceleration
-      , connect_id = C#connect.connect_id
-      }
+      #verify_connect{
+         outgoing_peer_id = PeerInfo#peer_info.id,
+         incoming_session_id = IncomingSessionID,
+         outgoing_session_id = OutgoingSessionID,
+         mtu = clamp(C#connect.mtu, ?MAX_MTU, ?MIN_MTU),
+         window_size = WindowSize,
+         channel_count = min(C#connect.channel_count, HostChannelLimit),
+         incoming_bandwidth = IncomingBandwidth,
+         outgoing_bandwidth = OutgoingBandwidth,
+         packet_throttle_interval = C#connect.packet_throttle_interval,
+         packet_throttle_acceleration = C#connect.packet_throttle_acceleration,
+         packet_throttle_deceleration = C#connect.packet_throttle_deceleration,
+         connect_id = C#connect.connect_id
+        }
     }.
 
 

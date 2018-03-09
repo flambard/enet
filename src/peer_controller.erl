@@ -196,10 +196,17 @@ connecting(send_connect, S) ->
        peer_info = PeerInfo,
        connect_id = ConnectID
       } = S,
+    HostData = PeerInfo#peer_info.host_data,
+    IncomingBandwidth = host_data:lookup(HostData, incoming_bandwidth),
+    OutgoingBandwidth = host_data:lookup(HostData, outgoing_bandwidth),
+    MTU = host_data:lookup(HostData, mtu),
     {ConnectH, ConnectC} =
         protocol:make_connect_command(
           PeerInfo,
           maps:size(Channels),
+          MTU,
+          IncomingBandwidth,
+          OutgoingBandwidth,
           S#state.packet_throttle_interval,
           S#state.packet_throttle_acceleration,
           S#state.packet_throttle_deceleration,
@@ -255,7 +262,15 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
        port = Port,
        peer_info = PeerInfo
       } = S,
-    {VCH, VCC} = protocol:make_verify_connect_command(C, PeerInfo),
+    HostData = PeerInfo#peer_info.host_data,
+    HostChannelLimit = host_data:lookup(HostData, channel_limit),
+    HostIncomingBandwidth = host_data:lookup(HostData, incoming_bandwidth),
+    HostOutgoingBandwidth = host_data:lookup(HostData, outgoing_bandwidth),
+    {VCH, VCC} = protocol:make_verify_connect_command(C,
+                                                      PeerInfo,
+                                                      HostChannelLimit,
+                                                      HostIncomingBandwidth,
+                                                      HostOutgoingBandwidth),
     HBin = wire_protocol_encode:command_header(VCH),
     CBin = wire_protocol_encode:command(VCC),
     {sent_time, _VerifyConnectSentTime} =
