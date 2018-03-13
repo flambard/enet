@@ -6,7 +6,8 @@
   {applications, [
                   kernel,
                   stdlib,
-                  crypto
+                  crypto,
+                  gproc
                  ]},
   {mod, {enet_app, []}},
   {env, []}
