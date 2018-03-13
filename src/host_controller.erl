@@ -212,16 +212,23 @@ handle_info({udp, Socket, IP, Port, Packet},
     end,
     {noreply, S};
 
-handle_info({'DOWN', _Ref, process, Pid, Reason}, S) ->
+handle_info({'DOWN', _Ref, process, _Pid, normal}, S) ->
+    %%
+    %% A Peer Controller process has exited normally.
+    %%
+    %% - Do nothing.
+    %%
+    {noreply, S};
+
+handle_info({'DOWN', _Ref, process, Pid, _Reason}, S) ->
     %%
     %% A Peer Controller process has exited.
     %%
     %% - Remove it from the Peer Table
     %% - Send an unsequenced Disconnect message if the peer exited abnormally
     %%
-    case peer_table:take(S#state.peer_table, Pid) of
+    case peer_table:lookup_by_pid(S#state.peer_table, Pid) of
         not_found                      -> ok;
-        _Peer when Reason =:= normal   -> ok;
         #peer{ remote_id = undefined } -> ok;
         #peer{ remote_id = PeerID, ip = IP, port = Port } ->
             PH = #protocol_header{
@@ -234,6 +241,15 @@ handle_info({'DOWN', _Ref, process, Pid, Reason}, S) ->
                        wire_protocol_encode:command(Command) ],
             ok = gen_udp:send(S#state.socket, IP, Port, Packet)
     end,
+    {noreply, S};
+
+handle_info({gproc, unreg, _Ref, {n, l, {sup_of_peer, Pid}}}, S) ->
+    %%
+    %% A Peer-Channel Supervisor process has exited.
+    %%
+    %% - Remove its Peer Controller from the Peer Table
+    %%
+    _Peer = peer_table:take(S#state.peer_table, Pid),
     {noreply, S}.
 
 
@@ -267,6 +283,8 @@ start_peer(Table, PeerSup, LocalOrRemote, Host, N, PeerInfo, IP, Port, Owner) ->
     {ok, Pid} =
         peer_channel_sup:start_peer_controller(
           PCSup, LocalOrRemote, Host, ChannelSup, N, PeerInfo, IP, Port, Owner),
-    monitor(process, Pid),
+    %% monitor(process, Pid),
+    true = gproc:reg_other({n, l, {sup_of_peer, Pid}}, PCSup),
+    _Ref = gproc:monitor({n, l, {sup_of_peer, Pid}}),
     true = peer_table:set_peer_pid(Table, ID, Pid),
     {ok, Pid}.
