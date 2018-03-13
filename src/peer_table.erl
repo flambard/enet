@@ -3,12 +3,14 @@
 -include("peer.hrl").
 -include("peer_info.hrl").
 
--export([ new/1
-        , insert/5
-        , take/2
-        , set_peer_pid/3
-        , set_remote_peer_id/3
-        , lookup_by_id/2
+-export([
+         new/1,
+         insert/5,
+         take/2,
+         set_peer_pid/3,
+         set_remote_peer_id/3,
+         lookup_by_id/2,
+         lookup_by_pid/2
         ]).
 
 
@@ -62,6 +64,12 @@ set_remote_peer_id(Table, PeerPid, RemoteID) ->
 
 lookup_by_id(Table, PeerID) ->
     case ets:lookup(Table, PeerID) of
+        [Peer] -> Peer;
+        []     -> not_found
+    end.
+
+lookup_by_pid(Table, PeerPid) ->
+    case ets:match_object(Table, #peer{ pid = PeerPid, _ = '_'}) of
         [Peer] -> Peer;
         []     -> not_found
     end.
