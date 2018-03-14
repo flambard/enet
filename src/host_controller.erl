@@ -283,7 +283,7 @@ start_peer(Table, PeerSup, LocalOrRemote, Host, N, PeerInfo, IP, Port, Owner) ->
     {ok, Pid} =
         peer_channel_sup:start_peer_controller(
           PCSup, LocalOrRemote, Host, ChannelSup, N, PeerInfo, IP, Port, Owner),
-    %% monitor(process, Pid),
+    monitor(process, Pid),
     true = gproc:reg_other({n, l, {sup_of_peer, Pid}}, PCSup),
     _Ref = gproc:monitor({n, l, {sup_of_peer, Pid}}),
     true = peer_table:set_peer_pid(Table, ID, Pid),
