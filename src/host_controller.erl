@@ -15,7 +15,11 @@
          sync_connect/4,
          set_remote_peer_id/2,
          send_outgoing_commands/4,
-         send_outgoing_commands/5
+         send_outgoing_commands/5,
+         get_incoming_bandwidth/1,
+         get_outgoing_bandwidth/1,
+         get_mtu/1,
+         get_channel_limit/1
         ]).
 
 %% gen_server callbacks
@@ -34,7 +38,6 @@
           socket,
           peer_sup,
           peer_table,
-          data,
           compress_fun,
           decompress_fun
         }).
@@ -79,6 +82,18 @@ send_outgoing_commands(Host, Commands, IP, Port) ->
 send_outgoing_commands(Host, Commands, IP, Port, PeerID) ->
     gen_server:call(Host, {send_outgoing_commands, Commands, IP, Port, PeerID}).
 
+get_incoming_bandwidth(Host) ->
+    gproc:get_value({p, l, incoming_bandwidth}, Host).
+
+get_outgoing_bandwidth(Host) ->
+    gproc:get_value({p, l, outgoing_bandwidth}, Host).
+
+get_mtu(Host) ->
+    gproc:get_value({p, l, mtu}, Host).
+
+get_channel_limit(Host) ->
+    gproc:get_value({p, l, channel_limit}, Host).
+
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -90,7 +105,28 @@ init({Owner, Port, PeerSup, Options}) ->
             {peer_limit, PLimit} -> PLimit;
             false                -> 1
         end,
-    {ok, HostData} = host_data:make(Options),
+    ChannelLimit =
+        case lists:keyfind(channel_limit, 1, Options) of
+            {channel_limit, CLimit} -> CLimit;
+            false                   -> ?MIN_CHANNEL_COUNT
+        end,
+    IncomingBandwidth =
+        case lists:keyfind(incoming_bandwidth, 1, Options) of
+            {incoming_bandwidth, IBandwidth} -> IBandwidth;
+            false                            -> 0
+        end,
+    OutgoingBandwidth =
+        case lists:keyfind(outgoing_bandwidth, 1, Options) of
+            {outgoing_bandwidth, OBandwidth} -> OBandwidth;
+            false                            -> 0
+        end,
+    true = gproc:mreg(p, l,
+                      [
+                       {channel_limit, ChannelLimit},
+                       {incoming_bandwidth, IncomingBandwidth},
+                       {outgoing_bandwidth, OutgoingBandwidth},
+                       {mtu, ?HOST_DEFAULT_MTU}
+                      ]),
     SocketOptions = [
                      binary,
                      {active, true},
@@ -101,8 +137,7 @@ init({Owner, Port, PeerSup, Options}) ->
             owner = Owner,
             socket = Socket,
             peer_sup = PeerSup,
-            peer_table = peer_table:new(PeerLimit),
-            data = HostData
+            peer_table = peer_table:new(PeerLimit)
            }}.
 
 handle_call(stop, _From, S) ->
@@ -121,10 +156,9 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
         case peer_table:insert(Table, undefined, IP, Port, undefined) of
             {error, table_full}     -> {error, reached_peer_limit};
             {ok, PI = #peer_info{}} ->
-                PeerInfo = PI#peer_info{ host_data = S#state.data },
                 Sup = S#state.peer_sup,
                 start_peer(
-                  Table, Sup, local, self(), Channels, PeerInfo, IP, Port, Owner)
+                  Table, Sup, local, self(), Channels, PI, IP, Port, Owner)
         end,
     {reply, Reply, S};
 
@@ -195,13 +229,12 @@ handle_info({udp, Socket, IP, Port, Packet},
                 {error, table_full}     -> reached_peer_limit;
                 {ok, PI = #peer_info{}} ->
                     Owner = S#state.owner,
-                    PeerInfo = PI#peer_info{ host_data = S#state.data },
                     Sup = S#state.peer_sup,
                     %% Channel count is included in the Connect command
                     N = undefined,
                     {ok, Pid} =
                         start_peer(
-                          PeerTable, Sup, remote, self(), N, PeerInfo, IP, Port, Owner),
+                          PeerTable, Sup, remote, self(), N, PI, IP, Port, Owner),
                     ok = peer_controller:recv_incoming_packet(
                            Pid, SentTime, Commands)
             end;

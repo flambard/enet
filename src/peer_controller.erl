@@ -39,7 +39,6 @@
         {
           owner,
           host,
-          host_data,
           channel_sup,
           channels,
           ip,
@@ -156,7 +155,6 @@ init({local_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner}) ->
            channel_sup = ChannelSup,
            channels = Channels,
            host = Host,
-           host_data = PeerInfo#peer_info.host_data,
            ip = IP,
            port = Port,
            peer_info = PeerInfo,
@@ -171,7 +169,6 @@ init({remote_connect, Host, ChannelSup, _N, PeerInfo, IP, Port, Owner}) ->
     S = #state{
            owner = Owner,
            host = Host,
-           host_data = PeerInfo#peer_info.host_data,
            channel_sup = ChannelSup,
            ip = IP,
            port = Port,
@@ -196,10 +193,9 @@ connecting(send_connect, S) ->
        peer_info = PeerInfo,
        connect_id = ConnectID
       } = S,
-    HostData = PeerInfo#peer_info.host_data,
-    IncomingBandwidth = host_data:lookup(HostData, incoming_bandwidth),
-    OutgoingBandwidth = host_data:lookup(HostData, outgoing_bandwidth),
-    MTU = host_data:lookup(HostData, mtu),
+    IncomingBandwidth = host_controller:get_incoming_bandwidth(Host),
+    OutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
+    MTU = host_controller:get_mtu(Host),
     {ConnectH, ConnectC} =
         protocol:make_connect_command(
           PeerInfo,
@@ -262,10 +258,9 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
        port = Port,
        peer_info = PeerInfo
       } = S,
-    HostData = PeerInfo#peer_info.host_data,
-    HostChannelLimit = host_data:lookup(HostData, channel_limit),
-    HostIncomingBandwidth = host_data:lookup(HostData, incoming_bandwidth),
-    HostOutgoingBandwidth = host_data:lookup(HostData, outgoing_bandwidth),
+    HostChannelLimit = host_controller:get_channel_limit(Host),
+    HostIncomingBandwidth = host_controller:get_incoming_bandwidth(Host),
+    HostOutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
     {VCH, VCC} = protocol:make_verify_connect_command(C,
                                                       PeerInfo,
                                                       HostChannelLimit,
@@ -276,7 +271,7 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     {sent_time, _VerifyConnectSentTime} =
         host_controller:send_outgoing_commands(
           Host, [HBin, CBin], IP, Port, RemotePeerID),
-    ok = host_controller:set_remote_peer_id(S#state.host, RemotePeerID),
+    ok = host_controller:set_remote_peer_id(Host, RemotePeerID),
     Channels = start_channels(ChannelSup, ChannelCount, Owner),
     NewS = S#state{
              remote_peer_id = RemotePeerID,
@@ -401,8 +396,8 @@ connected({incoming_command, {_H, C = #bandwidth_limit{}}}, S) ->
        incoming_bandwidth = IncomingBandwidth,
        outgoing_bandwidth = OutgoingBandwidth
       } = C,
-    #state{ peer_info = #peer_info{ host_data = HostData }} = S,
-    HostOutgoingBandwidth = host_data:lookup(HostData, outgoing_bandwidth),
+    #state{ host = Host } = S,
+    HostOutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
     WSize =
         case {IncomingBandwidth, HostOutgoingBandwidth} of
             {0, 0} -> ?MAX_WINDOW_SIZE;
