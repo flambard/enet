@@ -1,8 +1,6 @@
 -module(peer_sup).
 -behaviour(supervisor).
 
--include("peer_info.hrl").
-
 %% API
 -export([
          start_link/0,
