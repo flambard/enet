@@ -153,7 +153,7 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
     %%
     Table = S#state.peer_table,
     Reply =
-        case peer_table:insert(Table, undefined, IP, Port, undefined) of
+        case peer_table:insert(Table, undefined, IP, Port) of
             {error, table_full}     -> {error, reached_peer_limit};
             {ok, PI = #peer_info{}} ->
                 Sup = S#state.peer_sup,
@@ -225,7 +225,7 @@ handle_info({udp, Socket, IP, Port, Packet},
             %% No particular peer is the receiver of this packet.
             %% Create a new peer.
             PeerTable = S#state.peer_table,
-            case peer_table:insert(PeerTable, undefined, IP, Port, undefined) of
+            case peer_table:insert(PeerTable, undefined, IP, Port) of
                 {error, table_full}     -> reached_peer_limit;
                 {ok, PI = #peer_info{}} ->
                     Owner = S#state.owner,

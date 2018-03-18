@@ -5,7 +5,7 @@
 
 -export([
          new/1,
-         insert/5,
+         insert/4,
          take/2,
          set_peer_pid/3,
          set_remote_peer_id/3,
@@ -23,22 +23,23 @@ new(Limit) ->
 %% Dialyzer warns incorrectly about matching here, ignore.
 -dialyzer({no_match, insert/5}).
 
-insert(Table, PeerPid, IP, Port, RemotePeerID) ->
+insert(Table, PeerPid, IP, Port) ->
     case ets:match_object(Table, #peer{ pid = undefined, _ = '_' }, 1) of
         '$end_of_table'                 -> {error, table_full};
         {[P = #peer{ id = PeerID }], _} ->
-            Peer = P#peer{ id = PeerID
-                         , pid = PeerPid
-                         , remote_id = RemotePeerID
-                         , ip = IP
-                         , port = Port
-                         },
+            Peer = P#peer{
+                     id = PeerID,
+                     pid = PeerPid,
+                     ip = IP,
+                     port = Port
+                    },
             true = ets:insert(Table, Peer),
             PeerInfo =
-                #peer_info{ id = PeerID
-                          , incoming_session_id = P#peer.incoming_session_id
-                          , outgoing_session_id = P#peer.outgoing_session_id
-                          },
+                #peer_info{
+                   id = PeerID,
+                   incoming_session_id = P#peer.incoming_session_id,
+                   outgoing_session_id = P#peer.outgoing_session_id
+                  },
             {ok, PeerInfo}
     end.
 
