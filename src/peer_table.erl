@@ -15,7 +15,7 @@
 
 
 new(Limit) ->
-    Table = ets:new(peers, [set, protected, {keypos, #peer.id}]), %% TODO: private
+    Table = ets:new(peers, [set, private, {keypos, #peer.id}]),
     ets:insert(Table, [#peer{ id = ID } || ID <- lists:seq(0, Limit - 1)]),
     Table.
 
