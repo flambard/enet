@@ -44,7 +44,9 @@
           ip,
           port,
           remote_peer_id = undefined,
-          peer_info,
+          peer_id,
+          incoming_session_id,
+          outgoing_session_id,
           incoming_bandwidth = 0,
           outgoing_bandwidth = 0,
           window_size = ?MAX_WINDOW_SIZE,
@@ -150,6 +152,11 @@ init({local_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner}) ->
     Channels = start_channels(ChannelSup, N, Owner),
     <<ConnectID:32>> = crypto:strong_rand_bytes(4),
     ok = gen_fsm:send_event(self(), send_connect),
+    #peer_info{
+       id = PeerID,
+       incoming_session_id = IncomingSessionID,
+       outgoing_session_id = OutgoingSessionID
+      } = PeerInfo,
     S = #state{
            owner = Owner,
            channel_sup = ChannelSup,
@@ -157,7 +164,9 @@ init({local_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner}) ->
            host = Host,
            ip = IP,
            port = Port,
-           peer_info = PeerInfo,
+           peer_id = PeerID,
+           incoming_session_id = IncomingSessionID,
+           outgoing_session_id = OutgoingSessionID,
            connect_id = ConnectID
           },
     {ok, connecting, S};
@@ -166,13 +175,20 @@ init({remote_connect, Host, ChannelSup, _N, PeerInfo, IP, Port, Owner}) ->
     %%
     %% Describe
     %%
+    #peer_info{
+       id = PeerID,
+       incoming_session_id = IncomingSessionID,
+       outgoing_session_id = OutgoingSessionID
+      } = PeerInfo,
     S = #state{
            owner = Owner,
            host = Host,
            channel_sup = ChannelSup,
            ip = IP,
            port = Port,
-           peer_info = PeerInfo
+           peer_id = PeerID,
+           incoming_session_id = IncomingSessionID,
+           outgoing_session_id = OutgoingSessionID
           },
     {ok, acknowledging_connect, S, ?PEER_TIMEOUT_MINIMUM}.
 
@@ -190,14 +206,11 @@ connecting(send_connect, S) ->
        channels = Channels,
        ip = IP,
        port = Port,
-       peer_info = PeerInfo,
+       peer_id = PeerID,
+       incoming_session_id = IncomingSessionID,
+       outgoing_session_id = OutgoingSessionID,
        connect_id = ConnectID
       } = S,
-    #peer_info{
-       id = PeerID,
-       incoming_session_id = IncomingSessionID,
-       outgoing_session_id = OutgoingSessionID
-      } = PeerInfo,
     IncomingBandwidth = host_controller:get_incoming_bandwidth(Host),
     OutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
     MTU = host_controller:get_mtu(Host),
@@ -263,13 +276,10 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
        channel_sup = ChannelSup,
        ip = IP,
        port = Port,
-       peer_info = PeerInfo
-      } = S,
-    #peer_info{
-       id = PeerID,
+       peer_id = PeerID,
        incoming_session_id = IncomingSessionID,
        outgoing_session_id = OutgoingSessionID
-      } = PeerInfo,
+      } = S,
     HostChannelLimit = host_controller:get_channel_limit(Host),
     HostIncomingBandwidth = host_controller:get_incoming_bandwidth(Host),
     HostOutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
