@@ -1,13 +1,12 @@
 -module(protocol).
 
--include("peer_info.hrl").
 -include("commands.hrl").
 -include("protocol.hrl").
 
 -export([
          make_acknowledge_command/2,
-         make_connect_command/9,
-         make_verify_connect_command/5,
+         make_connect_command/11,
+         make_verify_connect_command/7,
          make_sequenced_disconnect_command/0,
          make_unsequenced_disconnect_command/0,
          make_send_unsequenced_command/2,
@@ -29,7 +28,9 @@ make_acknowledge_command(H = #command_header{}, SentTime) ->
     }.
 
 
-make_connect_command(PeerInfo = #peer_info{},
+make_connect_command(OutgoingPeerID,
+                     IncomingSessionID,
+                     OutgoingSessionID,
                      ChannelCount,
                      MTU,
                      IncomingBandwidth,
@@ -46,9 +47,9 @@ make_connect_command(PeerInfo = #peer_info{},
          please_acknowledge = 1
         },
       #connect{
-         outgoing_peer_id = PeerInfo#peer_info.id,
-         incoming_session_id = PeerInfo#peer_info.incoming_session_id,
-         outgoing_session_id = PeerInfo#peer_info.outgoing_session_id,
+         outgoing_peer_id = OutgoingPeerID,
+         incoming_session_id = IncomingSessionID,
+         outgoing_session_id = OutgoingSessionID,
          mtu = MTU,
          window_size = WindowSize,
          channel_count = ChannelCount,
@@ -64,18 +65,18 @@ make_connect_command(PeerInfo = #peer_info{},
 
 
 make_verify_connect_command(C = #connect{},
-                            PeerInfo = #peer_info{},
+                            OutgoingPeerID,
+                            IncomingSessionID,
+                            OutgoingSessionID,
                             HostChannelLimit,
                             IncomingBandwidth,
                             OutgoingBandwidth) ->
     WindowSize =
         calculate_window_size(IncomingBandwidth, C#connect.window_size),
-    IncomingSessionID =
-        calculate_session_id(C#connect.incoming_session_id,
-                             PeerInfo#peer_info.outgoing_session_id),
-    OutgoingSessionID =
-        calculate_session_id(C#connect.outgoing_session_id,
-                             PeerInfo#peer_info.incoming_session_id),
+    ISID =
+        calculate_session_id(C#connect.incoming_session_id, OutgoingSessionID),
+    OSID =
+        calculate_session_id(C#connect.outgoing_session_id, IncomingSessionID),
     {
       #command_header{
          command = ?COMMAND_VERIFY_CONNECT,
@@ -83,9 +84,9 @@ make_verify_connect_command(C = #connect{},
          please_acknowledge = 1
         },
       #verify_connect{
-         outgoing_peer_id = PeerInfo#peer_info.id,
-         incoming_session_id = IncomingSessionID,
-         outgoing_session_id = OutgoingSessionID,
+         outgoing_peer_id = OutgoingPeerID,
+         incoming_session_id = ISID,
+         outgoing_session_id = OSID,
          mtu = clamp(C#connect.mtu, ?MAX_MTU, ?MIN_MTU),
          window_size = WindowSize,
          channel_count = min(C#connect.channel_count, HostChannelLimit),

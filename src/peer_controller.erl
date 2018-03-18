@@ -193,12 +193,19 @@ connecting(send_connect, S) ->
        peer_info = PeerInfo,
        connect_id = ConnectID
       } = S,
+    #peer_info{
+       id = PeerID,
+       incoming_session_id = IncomingSessionID,
+       outgoing_session_id = OutgoingSessionID
+      } = PeerInfo,
     IncomingBandwidth = host_controller:get_incoming_bandwidth(Host),
     OutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
     MTU = host_controller:get_mtu(Host),
     {ConnectH, ConnectC} =
         protocol:make_connect_command(
-          PeerInfo,
+          PeerID,
+          IncomingSessionID,
+          OutgoingSessionID,
           maps:size(Channels),
           MTU,
           IncomingBandwidth,
@@ -258,11 +265,18 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
        port = Port,
        peer_info = PeerInfo
       } = S,
+    #peer_info{
+       id = PeerID,
+       incoming_session_id = IncomingSessionID,
+       outgoing_session_id = OutgoingSessionID
+      } = PeerInfo,
     HostChannelLimit = host_controller:get_channel_limit(Host),
     HostIncomingBandwidth = host_controller:get_incoming_bandwidth(Host),
     HostOutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
     {VCH, VCC} = protocol:make_verify_connect_command(C,
-                                                      PeerInfo,
+                                                      PeerID,
+                                                      IncomingSessionID,
+                                                      OutgoingSessionID,
                                                       HostChannelLimit,
                                                       HostIncomingBandwidth,
                                                       HostOutgoingBandwidth),
