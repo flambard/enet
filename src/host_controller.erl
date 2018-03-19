@@ -2,7 +2,6 @@
 -behaviour(gen_server).
 
 -include("peer.hrl").
--include("peer_info.hrl").
 -include("commands.hrl").
 -include("protocol.hrl").
 
@@ -154,8 +153,8 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
     Table = S#state.peer_table,
     Reply =
         case peer_table:insert(Table, IP, Port) of
-            {error, table_full}             -> {error, reached_peer_limit};
-            {ok, #peer_info{ id = PeerID }} ->
+            {error, table_full} -> {error, reached_peer_limit};
+            {ok, PeerID }       ->
                 Sup = S#state.peer_sup,
                 start_peer(
                   Table, Sup, local, self(), Channels, PeerID, IP, Port, Owner)
@@ -226,8 +225,8 @@ handle_info({udp, Socket, IP, Port, Packet},
             %% Create a new peer.
             PeerTable = S#state.peer_table,
             case peer_table:insert(PeerTable, IP, Port) of
-                {error, table_full}             -> reached_peer_limit;
-                {ok, #peer_info{ id = PeerID }} ->
+                {error, table_full} -> reached_peer_limit;
+                {ok, PeerID }       ->
                     Owner = S#state.owner,
                     Sup = S#state.peer_sup,
                     %% Channel count is included in the Connect command

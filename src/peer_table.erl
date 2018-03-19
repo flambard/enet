@@ -1,7 +1,6 @@
 -module(peer_table).
 
 -include("peer.hrl").
--include("peer_info.hrl").
 
 -export([
          new/1,
@@ -33,13 +32,7 @@ insert(Table, IP, Port) ->
                      port = Port
                     },
             true = ets:insert(Table, Peer),
-            PeerInfo =
-                #peer_info{
-                   id = PeerID,
-                   incoming_session_id = P#peer.incoming_session_id,
-                   outgoing_session_id = P#peer.outgoing_session_id
-                  },
-            {ok, PeerInfo}
+            {ok, PeerID}
     end.
 
 take(Table, PeerPid) ->
