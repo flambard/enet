@@ -150,12 +150,14 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
     %%
     %% Describe
     %%
-    Table = S#state.peer_table,
+    #state{
+       peer_table = Table,
+       peer_sup = Sup
+      } = S,
     Reply =
         case peer_table:insert(Table, IP, Port) of
             {error, table_full} -> {error, reached_peer_limit};
             {ok, PeerID}        ->
-                Sup = S#state.peer_sup,
                 start_peer(
                   Table, Sup, local, self(), Channels, PeerID, IP, Port, Owner)
         end,
@@ -202,8 +204,7 @@ handle_cast(_Msg, State) ->
 %%% handle_info
 %%%
 
-handle_info({udp, Socket, IP, Port, Packet},
-            S = #state{ socket = Socket }) ->
+handle_info({udp, Socket, IP, Port, Packet}, S) ->
     %%
     %% Received a UDP packet.
     %%
@@ -211,24 +212,27 @@ handle_info({udp, Socket, IP, Port, Packet},
     %% - Decompress the remaining packet if necessary
     %% - Send the packet to the peer (ID in protocol header)
     %%
+    #state{
+       socket = Socket,
+       decompress_fun = Decompress,
+       peer_table = PeerTable,
+       owner = Owner,
+       peer_sup = Sup
+      } = S,
     {ok, PH, Rest} = wire_protocol_decode:protocol_header(Packet),
     Commands =
         case PH#protocol_header.compressed of
             0 -> Rest;
-            1 -> Decompress = S#state.decompress_fun,
-                 Decompress(Rest)
+            1 -> Decompress(Rest)
         end,
     SentTime = PH#protocol_header.sent_time,
     case PH#protocol_header.peer_id of
         ?NULL_PEER_ID ->
             %% No particular peer is the receiver of this packet.
             %% Create a new peer.
-            PeerTable = S#state.peer_table,
             case peer_table:insert(PeerTable, IP, Port) of
                 {error, table_full} -> reached_peer_limit;
                 {ok, PeerID}        ->
-                    Owner = S#state.owner,
-                    Sup = S#state.peer_sup,
                     %% Channel count is included in the Connect command
                     N = undefined,
                     {ok, Pid} = start_peer(PeerTable,
@@ -245,7 +249,7 @@ handle_info({udp, Socket, IP, Port, Packet},
             end;
         PeerID ->
             #peer{ pid = Pid } =
-                peer_table:lookup_by_id(S#state.peer_table, PeerID),
+                peer_table:lookup_by_id(PeerTable, PeerID),
             ok = peer_controller:recv_incoming_packet(Pid, SentTime, Commands)
     end,
     {noreply, S};
@@ -265,7 +269,11 @@ handle_info({'DOWN', _Ref, process, Pid, _Reason}, S) ->
     %% - Remove it from the Peer Table
     %% - Send an unsequenced Disconnect message if the peer exited abnormally
     %%
-    case peer_table:lookup_by_pid(S#state.peer_table, Pid) of
+    #state{
+       peer_table = Table,
+       socket = Socket
+      } = S,
+    case peer_table:lookup_by_pid(Table, Pid) of
         not_found                      -> ok;
         #peer{ remote_id = undefined } -> ok;
         #peer{ remote_id = PeerID, ip = IP, port = Port } ->
@@ -277,7 +285,7 @@ handle_info({'DOWN', _Ref, process, Pid, _Reason}, S) ->
             Packet = [ wire_protocol_encode:protocol_header(PH),
                        wire_protocol_encode:command_header(CH),
                        wire_protocol_encode:command(Command) ],
-            ok = gen_udp:send(S#state.socket, IP, Port, Packet)
+            ok = gen_udp:send(Socket, IP, Port, Packet)
     end,
     {noreply, S};
 
