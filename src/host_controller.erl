@@ -248,8 +248,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                            Pid, SentTime, Commands)
             end;
         PeerID ->
-            #peer{ pid = Pid } =
-                peer_table:lookup_by_id(PeerTable, PeerID),
+            #peer{ pid = Pid } = peer_table:lookup_by_id(PeerTable, PeerID),
             ok = peer_controller:recv_incoming_packet(Pid, SentTime, Commands)
     end,
     {noreply, S};
@@ -282,9 +281,11 @@ handle_info({'DOWN', _Ref, process, Pid, _Reason}, S) ->
                     sent_time = get_time()
                    },
             {CH, Command} = protocol:make_unsequenced_disconnect_command(),
-            Packet = [ wire_protocol_encode:protocol_header(PH),
-                       wire_protocol_encode:command_header(CH),
-                       wire_protocol_encode:command(Command) ],
+            Packet = [
+                      wire_protocol_encode:protocol_header(PH),
+                      wire_protocol_encode:command_header(CH),
+                      wire_protocol_encode:command(Command)
+                     ],
             ok = gen_udp:send(Socket, IP, Port, Packet)
     end,
     {noreply, S};
