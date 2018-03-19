@@ -154,11 +154,11 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
     Table = S#state.peer_table,
     Reply =
         case peer_table:insert(Table, IP, Port) of
-            {error, table_full}     -> {error, reached_peer_limit};
-            {ok, PI = #peer_info{}} ->
+            {error, table_full}             -> {error, reached_peer_limit};
+            {ok, #peer_info{ id = PeerID }} ->
                 Sup = S#state.peer_sup,
                 start_peer(
-                  Table, Sup, local, self(), Channels, PI, IP, Port, Owner)
+                  Table, Sup, local, self(), Channels, PeerID, IP, Port, Owner)
         end,
     {reply, Reply, S};
 
@@ -226,15 +226,21 @@ handle_info({udp, Socket, IP, Port, Packet},
             %% Create a new peer.
             PeerTable = S#state.peer_table,
             case peer_table:insert(PeerTable, IP, Port) of
-                {error, table_full}     -> reached_peer_limit;
-                {ok, PI = #peer_info{}} ->
+                {error, table_full}             -> reached_peer_limit;
+                {ok, #peer_info{ id = PeerID }} ->
                     Owner = S#state.owner,
                     Sup = S#state.peer_sup,
                     %% Channel count is included in the Connect command
                     N = undefined,
-                    {ok, Pid} =
-                        start_peer(
-                          PeerTable, Sup, remote, self(), N, PI, IP, Port, Owner),
+                    {ok, Pid} = start_peer(PeerTable,
+                                           Sup,
+                                           remote,
+                                           self(),
+                                           N,
+                                           PeerID,
+                                           IP,
+                                           Port,
+                                           Owner),
                     ok = peer_controller:recv_incoming_packet(
                            Pid, SentTime, Commands)
             end;
@@ -309,15 +315,14 @@ code_change(_OldVsn, State, _Extra) ->
 get_time() ->
     erlang:system_time(1000) band 16#FFFF.
 
-start_peer(Table, PeerSup, LocalOrRemote, Host, N, PeerInfo, IP, Port, Owner) ->
-    ID = PeerInfo#peer_info.id,
-    {ok, PCSup} = peer_sup:start_peer_channel_supervisor(PeerSup, ID),
+start_peer(Table, PeerSup, LocalOrRemote, Host, N, PeerID, IP, Port, Owner) ->
+    {ok, PCSup} = peer_sup:start_peer_channel_supervisor(PeerSup, PeerID),
     {ok, ChannelSup} = peer_channel_sup:start_channel_supervisor(PCSup),
     {ok, Pid} =
         peer_channel_sup:start_peer_controller(
-          PCSup, LocalOrRemote, Host, ChannelSup, N, PeerInfo, IP, Port, Owner),
+          PCSup, LocalOrRemote, Host, ChannelSup, N, PeerID, IP, Port, Owner),
     monitor(process, Pid),
     true = gproc:reg_other({n, l, {sup_of_peer, Pid}}, PCSup),
     _Ref = gproc:monitor({n, l, {sup_of_peer, Pid}}),
-    true = peer_table:set_peer_pid(Table, ID, Pid),
+    true = peer_table:set_peer_pid(Table, PeerID, Pid),
     {ok, Pid}.

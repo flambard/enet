@@ -1,8 +1,6 @@
 -module(peer_channel_sup).
 -behaviour(supervisor).
 
--include("peer_info.hrl").
-
 %% API
 -export([
          start_link/0,
@@ -37,13 +35,13 @@ start_channel_supervisor(Supervisor) ->
     supervisor:start_child(Supervisor, Child).
 
 start_peer_controller(
-  Supervisor, LocalOrRemote, Host, ChannelSup, N, PeerInfo, IP, Port, Owner) ->
+  Supervisor, LocalOrRemote, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
     Child = #{
-      id => PeerInfo#peer_info.id,
+      id => PeerID,
       start => {
         peer_controller,
         start_link,
-        [LocalOrRemote, Host, ChannelSup, N, PeerInfo, IP, Port, Owner]
+        [LocalOrRemote, Host, ChannelSup, N, PeerID, IP, Port, Owner]
        },
       restart => permanent,
       shutdown => 1000,

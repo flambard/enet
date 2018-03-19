@@ -1,7 +1,6 @@
 -module(peer_controller).
 -behaviour(gen_fsm).
 
--include("peer_info.hrl").
 -include("commands.hrl").
 -include("protocol.hrl").
 
@@ -45,8 +44,8 @@
           port,
           remote_peer_id = undefined,
           peer_id,
-          incoming_session_id,
-          outgoing_session_id,
+          incoming_session_id = 16#FF,
+          outgoing_session_id = 16#FF,
           incoming_bandwidth = 0,
           outgoing_bandwidth = 0,
           window_size = ?MAX_WINDOW_SIZE,
@@ -110,16 +109,16 @@
 %%% API
 %%%===================================================================
 
-start_link(local, Host, ChannelSup, N, PeerInfo, IP, Port, Owner) ->
+start_link(local, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
     gen_fsm:start_link(
       ?MODULE,
-      {local_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner},
+      {local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner},
       []);
 
-start_link(remote, Host, ChannelSup, N, PeerInfo, IP, Port, Owner) ->
+start_link(remote, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
     gen_fsm:start_link(
       ?MODULE,
-      {remote_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner},
+      {remote_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner},
       []).
 
 disconnect(Peer) ->
@@ -142,7 +141,7 @@ send_command(Peer, {H, C}) ->
 %%% gen_fsm callbacks
 %%%===================================================================
 
-init({local_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner}) ->
+init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
     %%
     %% The client application wants to connect to a remote peer.
     %%
@@ -152,11 +151,6 @@ init({local_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner}) ->
     Channels = start_channels(ChannelSup, N, Owner),
     <<ConnectID:32>> = crypto:strong_rand_bytes(4),
     ok = gen_fsm:send_event(self(), send_connect),
-    #peer_info{
-       id = PeerID,
-       incoming_session_id = IncomingSessionID,
-       outgoing_session_id = OutgoingSessionID
-      } = PeerInfo,
     S = #state{
            owner = Owner,
            channel_sup = ChannelSup,
@@ -165,30 +159,21 @@ init({local_connect, Host, ChannelSup, N, PeerInfo, IP, Port, Owner}) ->
            ip = IP,
            port = Port,
            peer_id = PeerID,
-           incoming_session_id = IncomingSessionID,
-           outgoing_session_id = OutgoingSessionID,
            connect_id = ConnectID
           },
     {ok, connecting, S};
 
-init({remote_connect, Host, ChannelSup, _N, PeerInfo, IP, Port, Owner}) ->
+init({remote_connect, Host, ChannelSup, _N, PeerID, IP, Port, Owner}) ->
     %%
     %% Describe
     %%
-    #peer_info{
-       id = PeerID,
-       incoming_session_id = IncomingSessionID,
-       outgoing_session_id = OutgoingSessionID
-      } = PeerInfo,
     S = #state{
            owner = Owner,
            host = Host,
            channel_sup = ChannelSup,
            ip = IP,
            port = Port,
-           peer_id = PeerID,
-           incoming_session_id = IncomingSessionID,
-           outgoing_session_id = OutgoingSessionID
+           peer_id = PeerID
           },
     {ok, acknowledging_connect, S, ?PEER_TIMEOUT_MINIMUM}.
 
@@ -339,11 +324,9 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
        packet_throttle_deceleration = ThrottleDecelaration,
        connect_id                   = ConnectID
       } = C,
+    %%
     %% TODO: Calculate and validate Session IDs
-    %% #peer_info{
-    %%    incoming_session_id = IncomingSessionID,
-    %%    outgoing_session_id = OutgoingSessionID
-    %%   } = S#state.peer_info,
+    %%
     case {maps:size(S#state.channels), S} of
         {
           ChannelCount,
