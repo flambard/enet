@@ -445,7 +445,7 @@ connected({incoming_command, {H, C = #send_unsequenced{}}}, S) ->
     %%
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
-    ok = channel:recv_unsequenced(Channel, {H, C}),
+    ok = enet_channel:recv_unsequenced(Channel, {H, C}),
     {next_state, connected, S};
 
 connected({incoming_command, {H, C = #send_unreliable{}}}, S) ->
@@ -456,7 +456,7 @@ connected({incoming_command, {H, C = #send_unreliable{}}}, S) ->
     %%
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
-    ok = channel:recv_unreliable(Channel, {H, C}),
+    ok = enet_channel:recv_unreliable(Channel, {H, C}),
     {next_state, connected, S};
 
 connected({incoming_command, {H, C = #send_reliable{}}}, S) ->
@@ -467,7 +467,7 @@ connected({incoming_command, {H, C = #send_reliable{}}}, S) ->
     %%
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
-    ok = channel:recv_reliable(Channel, {H, C}),
+    ok = enet_channel:recv_reliable(Channel, {H, C}),
     {next_state, connected, S};
 
 connected({incoming_command, {_H, #disconnect{}}}, S) ->

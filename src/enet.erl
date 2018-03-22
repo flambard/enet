@@ -60,16 +60,16 @@ disconnect_peer(Peer) ->
 -spec send_unsequenced(Channel :: pid(), Data :: iolist()) -> ok.
 
 send_unsequenced(Channel, Data) ->
-    channel:send_unsequenced(Channel, Data).
+    enet_channel:send_unsequenced(Channel, Data).
 
 
 -spec send_unreliable(Channel :: pid(), Data :: iolist()) -> ok.
 
 send_unreliable(Channel, Data) ->
-    channel:send_unreliable(Channel, Data).
+    enet_channel:send_unreliable(Channel, Data).
 
 
 -spec send_reliable(Channel :: pid(), Data :: iolist()) -> ok.
 
 send_reliable(Channel, Data) ->
-    channel:send_reliable(Channel, Data).
+    enet_channel:send_reliable(Channel, Data).

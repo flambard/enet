@@ -1,4 +1,4 @@
--module(channel).
+-module(enet_channel).
 
 -include("commands.hrl").
 
