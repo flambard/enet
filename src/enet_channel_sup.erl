@@ -1,4 +1,4 @@
--module(channel_sup).
+-module(enet_channel_sup).
 -behaviour(supervisor).
 
 %% API

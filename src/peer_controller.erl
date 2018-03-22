@@ -651,8 +651,8 @@ start_channels(ChannelSup, N, Owner) ->
     Channels =
         lists:map(
           fun (ID) ->
-                  {ok, Channel} =
-                      channel_sup:start_channel(ChannelSup, ID, self(), Owner),
+                  {ok, Channel} = enet_channel_sup:start_channel(
+                                    ChannelSup, ID, self(), Owner),
                   {ID, Channel}
           end,
           IDs),
