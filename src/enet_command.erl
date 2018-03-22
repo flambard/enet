@@ -1,21 +1,21 @@
--module(protocol).
+-module(enet_command).
 
 -include("commands.hrl").
 -include("protocol.hrl").
 
 -export([
-         make_acknowledge_command/2,
-         make_connect_command/11,
-         make_verify_connect_command/7,
-         make_sequenced_disconnect_command/0,
-         make_unsequenced_disconnect_command/0,
-         make_send_unsequenced_command/2,
-         make_send_unreliable_command/3,
-         make_send_reliable_command/3
+         acknowledge/2,
+         connect/11,
+         verify_connect/7,
+         sequenced_disconnect/0,
+         unsequenced_disconnect/0,
+         send_unsequenced/2,
+         send_unreliable/3,
+         send_reliable/3
         ]).
 
 
-make_acknowledge_command(H = #command_header{}, SentTime) ->
+acknowledge(H = #command_header{}, SentTime) ->
     ReliableSequenceNumber = H#command_header.reliable_sequence_number,
     {
       #command_header{
@@ -28,17 +28,17 @@ make_acknowledge_command(H = #command_header{}, SentTime) ->
     }.
 
 
-make_connect_command(OutgoingPeerID,
-                     IncomingSessionID,
-                     OutgoingSessionID,
-                     ChannelCount,
-                     MTU,
-                     IncomingBandwidth,
-                     OutgoingBandwidth,
-                     PacketThrottleInterval,
-                     PacketThrottleAcceleration,
-                     PacketThrottleDeceleration,
-                     ConnectID) ->
+connect(OutgoingPeerID,
+        IncomingSessionID,
+        OutgoingSessionID,
+        ChannelCount,
+        MTU,
+        IncomingBandwidth,
+        OutgoingBandwidth,
+        PacketThrottleInterval,
+        PacketThrottleAcceleration,
+        PacketThrottleDeceleration,
+        ConnectID) ->
     WindowSize = calculate_initial_window_size(OutgoingBandwidth),
     {
       #command_header{
@@ -64,13 +64,13 @@ make_connect_command(OutgoingPeerID,
     }.
 
 
-make_verify_connect_command(C = #connect{},
-                            OutgoingPeerID,
-                            IncomingSessionID,
-                            OutgoingSessionID,
-                            HostChannelLimit,
-                            IncomingBandwidth,
-                            OutgoingBandwidth) ->
+verify_connect(C = #connect{},
+               OutgoingPeerID,
+               IncomingSessionID,
+               OutgoingSessionID,
+               HostChannelLimit,
+               IncomingBandwidth,
+               OutgoingBandwidth) ->
     WindowSize =
         calculate_window_size(IncomingBandwidth, C#connect.window_size),
     ISID =
@@ -100,7 +100,7 @@ make_verify_connect_command(C = #connect{},
     }.
 
 
-make_sequenced_disconnect_command() ->
+sequenced_disconnect() ->
     {
       #command_header{
          please_acknowledge = 1,
@@ -110,7 +110,7 @@ make_sequenced_disconnect_command() ->
     }.
 
 
-make_unsequenced_disconnect_command() ->
+unsequenced_disconnect() ->
     {
       #command_header{
          unsequenced = 1,
@@ -119,7 +119,7 @@ make_unsequenced_disconnect_command() ->
       #disconnect{}
     }.
 
-make_send_unsequenced_command(ChannelID, Data) ->
+send_unsequenced(ChannelID, Data) ->
     {
       #command_header{
          unsequenced = 1,
@@ -131,7 +131,7 @@ make_send_unsequenced_command(ChannelID, Data) ->
         }
     }.
 
-make_send_unreliable_command(ChannelID, UnreliableSequenceNumber, Data) ->
+send_unreliable(ChannelID, UnreliableSequenceNumber, Data) ->
     {
       #command_header{
          command = ?COMMAND_SEND_UNRELIABLE,
@@ -143,7 +143,7 @@ make_send_unreliable_command(ChannelID, UnreliableSequenceNumber, Data) ->
         }
     }.
 
-make_send_reliable_command(ChannelID, ReliableSequenceNumber, Data) ->
+send_reliable(ChannelID, ReliableSequenceNumber, Data) ->
     {
       #command_header{
          command = ?COMMAND_SEND_RELIABLE,

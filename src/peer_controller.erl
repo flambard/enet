@@ -200,7 +200,7 @@ connecting(send_connect, S) ->
     OutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
     MTU = host_controller:get_mtu(Host),
     {ConnectH, ConnectC} =
-        protocol:make_connect_command(
+        enet_command:connect(
           PeerID,
           IncomingSessionID,
           OutgoingSessionID,
@@ -268,13 +268,13 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     HostChannelLimit = host_controller:get_channel_limit(Host),
     HostIncomingBandwidth = host_controller:get_incoming_bandwidth(Host),
     HostOutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
-    {VCH, VCC} = protocol:make_verify_connect_command(C,
-                                                      PeerID,
-                                                      IncomingSessionID,
-                                                      OutgoingSessionID,
-                                                      HostChannelLimit,
-                                                      HostIncomingBandwidth,
-                                                      HostOutgoingBandwidth),
+    {VCH, VCC} = enet_command:verify_connect(C,
+                                             PeerID,
+                                             IncomingSessionID,
+                                             OutgoingSessionID,
+                                             HostChannelLimit,
+                                             HostIncomingBandwidth,
+                                             HostOutgoingBandwidth),
     HBin = wire_protocol_encode:command_header(VCH),
     CBin = wire_protocol_encode:command(VCC),
     {sent_time, _VerifyConnectSentTime} =
@@ -536,7 +536,7 @@ connected(disconnect, State) ->
     %% - Change state to 'disconnecting'
     %%
     #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = State,
-    {H, C} = protocol:make_sequenced_disconnect_command(),
+    {H, C} = enet_command:sequenced_disconnect(),
     HBin = wire_protocol_encode:command_header(H),
     CBin = wire_protocol_encode:command(C),
     host_controller:send_outgoing_commands(
@@ -589,7 +589,7 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
               %% - Send the command to self for handling
               %%
               Host = S#state.host,
-              {AckH, AckC} = protocol:make_acknowledge_command(H, SentTime),
+              {AckH, AckC} = enet_command:acknowledge(H, SentTime),
               HBin = wire_protocol_encode:command_header(AckH),
               CBin = wire_protocol_encode:command(AckC),
               RemotePeerID =

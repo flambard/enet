@@ -280,7 +280,7 @@ handle_info({'DOWN', _Ref, process, Pid, _Reason}, S) ->
                     peer_id = PeerID,
                     sent_time = get_time()
                    },
-            {CH, Command} = protocol:make_unsequenced_disconnect_command(),
+            {CH, Command} = enet_command:unsequenced_disconnect(),
             Packet = [
                       wire_protocol_encode:protocol_header(PH),
                       wire_protocol_encode:command_header(CH),
