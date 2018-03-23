@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 -include("peer.hrl").
--include("commands.hrl").
+-include("enet_commands.hrl").
 -include("enet_protocol.hrl").
 
 %% API

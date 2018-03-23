@@ -1,7 +1,7 @@
 -module(enet_tests).
 
 -include_lib("eunit/include/eunit.hrl").
--include("commands.hrl").
+-include("enet_commands.hrl").
 
 
 local_zero_peer_limit_test() ->

@@ -1,6 +1,6 @@
 -module(enet_channel).
 
--include("commands.hrl").
+-include("enet_commands.hrl").
 
 -export([
          start_link/3,

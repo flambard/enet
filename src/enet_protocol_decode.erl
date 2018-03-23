@@ -1,7 +1,7 @@
 -module(enet_protocol_decode).
 
 -include("enet_protocol.hrl").
--include("commands.hrl").
+-include("enet_commands.hrl").
 
 -export([
          protocol_header/1,

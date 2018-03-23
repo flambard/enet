@@ -1,7 +1,7 @@
 -module(enet_peer).
 -behaviour(gen_fsm).
 
--include("commands.hrl").
+-include("enet_commands.hrl").
 -include("enet_protocol.hrl").
 
 %% API
