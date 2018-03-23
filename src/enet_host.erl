@@ -1,4 +1,4 @@
--module(host_controller).
+-module(enet_host).
 -behaviour(gen_server).
 
 -include("peer.hrl").

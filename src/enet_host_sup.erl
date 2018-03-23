@@ -5,7 +5,7 @@
 -export([
          start_link/0,
          start_peer_supervisor/1,
-         start_host_controller/4
+         start_host/4
         ]).
 
 %% Supervisor callbacks
@@ -34,14 +34,14 @@ start_peer_supervisor(Supervisor) ->
      },
     supervisor:start_child(Supervisor, Child).
 
-start_host_controller(Supervisor, Port, PeerSup, Options) ->
+start_host(Supervisor, Port, PeerSup, Options) ->
     Child = #{
       id => host,
-      start => {host_controller, start_link, [self(), Port, PeerSup, Options]},
+      start => {enet_host, start_link, [self(), Port, PeerSup, Options]},
       restart => permanent,
       shutdown => 2000,
       type => worker,
-      modules => [host_controller]
+      modules => [enet_host]
      },
     supervisor:start_child(Supervisor, Child).
 

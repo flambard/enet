@@ -196,9 +196,9 @@ connecting(send_connect, S) ->
        outgoing_session_id = OutgoingSessionID,
        connect_id = ConnectID
       } = S,
-    IncomingBandwidth = host_controller:get_incoming_bandwidth(Host),
-    OutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
-    MTU = host_controller:get_mtu(Host),
+    IncomingBandwidth = enet_host:get_incoming_bandwidth(Host),
+    OutgoingBandwidth = enet_host:get_outgoing_bandwidth(Host),
+    MTU = enet_host:get_mtu(Host),
     {ConnectH, ConnectC} =
         enet_command:connect(
           PeerID,
@@ -215,7 +215,7 @@ connecting(send_connect, S) ->
     HBin = enet_protocol_encode:command_header(ConnectH),
     CBin = enet_protocol_encode:command(ConnectC),
     {sent_time, _ConnectSentTime} =
-        host_controller:send_outgoing_commands(Host, [HBin, CBin], IP, Port),
+        enet_host:send_outgoing_commands(Host, [HBin, CBin], IP, Port),
     {next_state, connecting, S, ?PEER_TIMEOUT_MINIMUM};
 
 connecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
@@ -265,9 +265,9 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
        incoming_session_id = IncomingSessionID,
        outgoing_session_id = OutgoingSessionID
       } = S,
-    HostChannelLimit = host_controller:get_channel_limit(Host),
-    HostIncomingBandwidth = host_controller:get_incoming_bandwidth(Host),
-    HostOutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
+    HostChannelLimit = enet_host:get_channel_limit(Host),
+    HostIncomingBandwidth = enet_host:get_incoming_bandwidth(Host),
+    HostOutgoingBandwidth = enet_host:get_outgoing_bandwidth(Host),
     {VCH, VCC} = enet_command:verify_connect(C,
                                              PeerID,
                                              IncomingSessionID,
@@ -278,11 +278,11 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     HBin = enet_protocol_encode:command_header(VCH),
     CBin = enet_protocol_encode:command(VCC),
     {sent_time, _VerifyConnectSentTime} =
-        host_controller:send_outgoing_commands(
+        enet_host:send_outgoing_commands(
           Host, [HBin, CBin], IP, Port, RemotePeerID),
     true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
     true = gproc:reg({p, l, remote_peer_id}, RemotePeerID),
-    ok = host_controller:set_remote_peer_id(Host, RemotePeerID),
+    ok = enet_host:set_remote_peer_id(Host, RemotePeerID),
     Channels = start_channels(ChannelSup, ChannelCount, Owner),
     NewS = S#state{
              remote_peer_id = RemotePeerID,
@@ -349,7 +349,7 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
         } ->
             true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
             true = gproc:reg({p, l, remote_peer_id}, RemotePeerID),
-            ok = host_controller:set_remote_peer_id(Host, RemotePeerID),
+            ok = enet_host:set_remote_peer_id(Host, RemotePeerID),
             Owner ! {enet, connect, local, {self(), Channels}, ConnectID},
             NewS = S#state{ remote_peer_id = RemotePeerID },
             {next_state, connected, NewS};
@@ -410,7 +410,7 @@ connected({incoming_command, {_H, C = #bandwidth_limit{}}}, S) ->
        outgoing_bandwidth = OutgoingBandwidth
       } = C,
     #state{ host = Host } = S,
-    HostOutgoingBandwidth = host_controller:get_outgoing_bandwidth(Host),
+    HostOutgoingBandwidth = enet_host:get_outgoing_bandwidth(Host),
     WSize =
         case {IncomingBandwidth, HostOutgoingBandwidth} of
             {0, 0} -> ?MAX_WINDOW_SIZE;
@@ -501,7 +501,7 @@ connected({outgoing_command, {H, C = #send_unsequenced{}}}, S) ->
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C1),
     {sent_time, _SentTime} =
-        host_controller:send_outgoing_commands(
+        enet_host:send_outgoing_commands(
           S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
     NewS = S#state{ outgoing_unsequenced_group = Group },
     {next_state, connected, NewS};
@@ -516,7 +516,7 @@ connected({outgoing_command, {H, C = #send_unreliable{}}}, S) ->
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C),
     {sent_time, _SentTime} =
-        host_controller:send_outgoing_commands(
+        enet_host:send_outgoing_commands(
           S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
     {next_state, connected, S};
 
@@ -530,7 +530,7 @@ connected({outgoing_command, {H, C = #send_reliable{}}}, S) ->
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C),
     {sent_time, _SentTime} =
-        host_controller:send_outgoing_commands(
+        enet_host:send_outgoing_commands(
           S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
     {next_state, connected, S};
 
@@ -545,7 +545,7 @@ connected(disconnect, State) ->
     {H, C} = enet_command:sequenced_disconnect(),
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C),
-    host_controller:send_outgoing_commands(
+    enet_host:send_outgoing_commands(
       State#state.host, [HBin, CBin], IP, Port, RemotePeerID),
     {next_state, disconnecting, State}.
 
@@ -605,7 +605,7 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
                       _                 -> S#state.remote_peer_id
                   end,
               {sent_time, _AckSentTime} =
-                  host_controller:send_outgoing_commands(
+                  enet_host:send_outgoing_commands(
                     Host, [HBin, CBin], IP, Port, RemotePeerID),
               gen_fsm:send_event(self(), {incoming_command, {H, C}})
       end,

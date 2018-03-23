@@ -21,7 +21,7 @@
 start_host(Port, Options) ->
     {ok, HostSup} = enet_sup:start_host_supervisor(Port),
     {ok, PeerSup} = enet_host_sup:start_peer_supervisor(HostSup),
-    case enet_host_sup:start_host_controller(HostSup, Port, PeerSup, Options) of
+    case enet_host_sup:start_host(HostSup, Port, PeerSup, Options) of
         {ok, HostController} -> {ok, HostController};
         {error, Reason} ->
             ok = enet_sup:stop_host_supervisor(Port),
@@ -40,7 +40,7 @@ stop_host(Port) ->
                           {ok, pid()} | {error, atom()}.
 
 connect_peer(Host, IP, Port, ChannelCount) ->
-    host_controller:connect(Host, IP, Port, ChannelCount).
+    enet_host:connect(Host, IP, Port, ChannelCount).
 
 
 -spec sync_connect_peer(Host :: pid(), IP :: string(), Port :: port_number(),
@@ -48,7 +48,7 @@ connect_peer(Host, IP, Port, ChannelCount) ->
                                {ok, pid()} | {error, atom()}.
 
 sync_connect_peer(Host, IP, Port, ChannelCount) ->
-    host_controller:sync_connect(Host, IP, Port, ChannelCount).
+    enet_host:sync_connect(Host, IP, Port, ChannelCount).
 
 
 -spec disconnect_peer(Peer :: pid()) -> ok.
