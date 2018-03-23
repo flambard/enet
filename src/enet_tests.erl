@@ -1,4 +1,4 @@
--module(tests).
+-module(enet_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 -include("commands.hrl").
