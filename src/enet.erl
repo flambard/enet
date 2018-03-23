@@ -54,7 +54,7 @@ sync_connect_peer(Host, IP, Port, ChannelCount) ->
 -spec disconnect_peer(Peer :: pid()) -> ok.
 
 disconnect_peer(Peer) ->
-    peer_controller:disconnect(Peer).
+    enet_peer:disconnect(Peer).
 
 
 -spec send_unsequenced(Channel :: pid(), Data :: iolist()) -> ok.

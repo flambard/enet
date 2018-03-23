@@ -92,7 +92,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
             loop(S);
         {send_unsequenced, Data} ->
             {H, C} = enet_command:send_unsequenced(ID, Data),
-            ok = peer_controller:send_command(Peer, {H, C}),
+            ok = enet_peer:send_command(Peer, {H, C}),
             loop(S);
         {recv_unreliable, {
            #command_header{},
@@ -109,7 +109,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
         {send_unreliable, Data} ->
             N = S#state.outgoing_unreliable_sequence_number,
             {H, C} = enet_command:send_unreliable(ID, N, Data),
-            ok = peer_controller:send_command(Peer, {H, C}),
+            ok = enet_peer:send_command(Peer, {H, C}),
             NewS = S#state{ outgoing_unreliable_sequence_number = N + 1 },
             loop(NewS);
         {recv_reliable, {
@@ -122,7 +122,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
         {send_reliable, Data} ->
             N = S#state.outgoing_reliable_sequence_number,
             {H, C} = enet_command:send_reliable(ID, N, Data),
-            ok = peer_controller:send_command(Peer, {H, C}),
+            ok = enet_peer:send_command(Peer, {H, C}),
             NewS = S#state{ outgoing_reliable_sequence_number = N + 1 },
             loop(NewS);
         stop ->

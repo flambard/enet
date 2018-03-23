@@ -1,4 +1,4 @@
--module(peer_controller).
+-module(enet_peer).
 -behaviour(gen_fsm).
 
 -include("commands.hrl").
@@ -280,6 +280,8 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     {sent_time, _VerifyConnectSentTime} =
         host_controller:send_outgoing_commands(
           Host, [HBin, CBin], IP, Port, RemotePeerID),
+    true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
+    true = gproc:reg({p, l, remote_peer_id}, RemotePeerID),
     ok = host_controller:set_remote_peer_id(Host, RemotePeerID),
     Channels = start_channels(ChannelSup, ChannelCount, Owner),
     NewS = S#state{
@@ -331,6 +333,8 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
         {
           ChannelCount,
           #state{
+             ip                           = IP,
+             port                         = Port,
              owner                        = Owner,
              host                         = Host,
              channels                     = Channels,
@@ -343,6 +347,8 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
              connect_id                   = ConnectID
             }
         } ->
+            true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
+            true = gproc:reg({p, l, remote_peer_id}, RemotePeerID),
             ok = host_controller:set_remote_peer_id(Host, RemotePeerID),
             Owner ! {enet, connect, local, {self(), Channels}, ConnectID},
             NewS = S#state{ remote_peer_id = RemotePeerID },

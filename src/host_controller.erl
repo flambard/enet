@@ -244,13 +244,12 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                                            IP,
                                            Port,
                                            Owner),
-                    ok = peer_controller:recv_incoming_packet(
-                           Pid, SentTime, Commands)
+                    ok = enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
             end;
         PeerID ->
             #peer{ pid = Pid } =
                 enet_peer_table:lookup_by_id(PeerTable, PeerID),
-            ok = peer_controller:recv_incoming_packet(Pid, SentTime, Commands)
+            ok = enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
     end,
     {noreply, S};
 
@@ -328,7 +327,7 @@ start_peer(Table, PeerSup, LocalOrRemote, Host, N, PeerID, IP, Port, Owner) ->
     {ok, PCSup} = enet_peer_sup:start_peer_channel_supervisor(PeerSup, PeerID),
     {ok, ChannelSup} = enet_peer_channel_sup:start_channel_supervisor(PCSup),
     {ok, Pid} =
-        enet_peer_channel_sup:start_peer_controller(
+        enet_peer_channel_sup:start_peer(
           PCSup, LocalOrRemote, Host, ChannelSup, N, PeerID, IP, Port, Owner),
     monitor(process, Pid),
     true = gproc:reg_other({n, l, {sup_of_peer, Pid}}, PCSup),
