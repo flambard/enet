@@ -1,4 +1,4 @@
--module(peer_table).
+-module(enet_peer_table).
 
 -include("peer.hrl").
 

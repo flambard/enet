@@ -136,7 +136,7 @@ init({Owner, Port, PeerSup, Options}) ->
             owner = Owner,
             socket = Socket,
             peer_sup = PeerSup,
-            peer_table = peer_table:new(PeerLimit)
+            peer_table = enet_peer_table:new(PeerLimit)
            }}.
 
 handle_call(stop, _From, S) ->
@@ -155,7 +155,7 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
        peer_sup = Sup
       } = S,
     Reply =
-        case peer_table:insert(Table, IP, Port) of
+        case enet_peer_table:insert(Table, IP, Port) of
             {error, table_full} -> {error, reached_peer_limit};
             {ok, PeerID}        ->
                 start_peer(
@@ -170,7 +170,7 @@ handle_call({set_remote_peer_id, PeerID} , {PeerPid, _}, S) ->
     %% - Update the Peer Table
     %% - Return 'ok'
     %%
-    peer_table:set_remote_peer_id(S#state.peer_table, PeerPid, PeerID),
+    enet_peer_table:set_remote_peer_id(S#state.peer_table, PeerPid, PeerID),
     {reply, ok, S};
 
 handle_call({send_outgoing_commands, Commands, IP, Port, ID}, _From, S) ->
@@ -230,7 +230,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
         ?NULL_PEER_ID ->
             %% No particular peer is the receiver of this packet.
             %% Create a new peer.
-            case peer_table:insert(PeerTable, IP, Port) of
+            case enet_peer_table:insert(PeerTable, IP, Port) of
                 {error, table_full} -> reached_peer_limit;
                 {ok, PeerID}        ->
                     %% Channel count is included in the Connect command
@@ -248,7 +248,8 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                            Pid, SentTime, Commands)
             end;
         PeerID ->
-            #peer{ pid = Pid } = peer_table:lookup_by_id(PeerTable, PeerID),
+            #peer{ pid = Pid } =
+                enet_peer_table:lookup_by_id(PeerTable, PeerID),
             ok = peer_controller:recv_incoming_packet(Pid, SentTime, Commands)
     end,
     {noreply, S};
@@ -272,7 +273,7 @@ handle_info({'DOWN', _Ref, process, Pid, _Reason}, S) ->
        peer_table = Table,
        socket = Socket
       } = S,
-    case peer_table:lookup_by_pid(Table, Pid) of
+    case enet_peer_table:lookup_by_pid(Table, Pid) of
         not_found                      -> ok;
         #peer{ remote_id = undefined } -> ok;
         #peer{ remote_id = PeerID, ip = IP, port = Port } ->
@@ -296,7 +297,7 @@ handle_info({gproc, unreg, _Ref, {n, l, {sup_of_peer, Pid}}}, S) ->
     %%
     %% - Remove its Peer Controller from the Peer Table
     %%
-    _Peer = peer_table:take(S#state.peer_table, Pid),
+    _Peer = enet_peer_table:take(S#state.peer_table, Pid),
     {noreply, S}.
 
 
@@ -332,5 +333,5 @@ start_peer(Table, PeerSup, LocalOrRemote, Host, N, PeerID, IP, Port, Owner) ->
     monitor(process, Pid),
     true = gproc:reg_other({n, l, {sup_of_peer, Pid}}, PCSup),
     _Ref = gproc:monitor({n, l, {sup_of_peer, Pid}}),
-    true = peer_table:set_peer_pid(Table, PeerID, Pid),
+    true = enet_peer_table:set_peer_pid(Table, PeerID, Pid),
     {ok, Pid}.
