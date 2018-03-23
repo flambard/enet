@@ -24,11 +24,11 @@ start_link() ->
 start_host_supervisor(ID) ->
     Child = #{
       id => ID,
-      start => {host_sup, start_link, []},
+      start => {enet_host_sup, start_link, []},
       restart => temporary,
       shutdown => infinity,
       type => supervisor,
-      modules => [host_sup]
+      modules => [enet_host_sup]
      },
     supervisor:start_child(?MODULE, Child).
 

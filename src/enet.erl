@@ -20,8 +20,8 @@
 
 start_host(Port, Options) ->
     {ok, HostSup} = enet_sup:start_host_supervisor(Port),
-    {ok, PeerSup} = host_sup:start_peer_supervisor(HostSup),
-    case host_sup:start_host_controller(HostSup, Port, PeerSup, Options) of
+    {ok, PeerSup} = enet_host_sup:start_peer_supervisor(HostSup),
+    case enet_host_sup:start_host_controller(HostSup, Port, PeerSup, Options) of
         {ok, HostController} -> {ok, HostController};
         {error, Reason} ->
             ok = enet_sup:stop_host_supervisor(Port),

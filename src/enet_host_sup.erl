@@ -1,4 +1,4 @@
--module(host_sup).
+-module(enet_host_sup).
 -behaviour(supervisor).
 
 %% API
