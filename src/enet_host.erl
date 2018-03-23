@@ -1,7 +1,7 @@
 -module(enet_host).
 -behaviour(gen_server).
 
--include("peer.hrl").
+-include("enet_peer.hrl").
 -include("enet_commands.hrl").
 -include("enet_protocol.hrl").
 

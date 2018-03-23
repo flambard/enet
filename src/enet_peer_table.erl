@@ -1,6 +1,6 @@
 -module(enet_peer_table).
 
--include("peer.hrl").
+-include("enet_peer.hrl").
 
 -export([
          new/1,
