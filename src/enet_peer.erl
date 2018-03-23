@@ -2,7 +2,7 @@
 -behaviour(gen_fsm).
 
 -include("commands.hrl").
--include("protocol.hrl").
+-include("enet_protocol.hrl").
 
 %% API
 -export([

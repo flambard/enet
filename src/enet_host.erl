@@ -3,7 +3,7 @@
 
 -include("peer.hrl").
 -include("commands.hrl").
--include("protocol.hrl").
+-include("enet_protocol.hrl").
 
 %% API
 -export([

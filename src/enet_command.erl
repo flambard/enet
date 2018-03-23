@@ -1,7 +1,7 @@
 -module(enet_command).
 
 -include("commands.hrl").
--include("protocol.hrl").
+-include("enet_protocol.hrl").
 
 -export([
          acknowledge/2,
