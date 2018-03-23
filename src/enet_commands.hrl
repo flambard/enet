@@ -1,4 +1,4 @@
--include("constants.hrl").
+-include("enet_constants.hrl").
 
 %%
 %% Protocol Header
