@@ -1,10 +1,11 @@
--module(wire_protocol_decode).
+-module(enet_protocol_decode).
 
 -include("protocol.hrl").
 -include("commands.hrl").
 
--export([ protocol_header/1
-        , commands/1
+-export([
+         protocol_header/1,
+         commands/1
         ]).
 
 

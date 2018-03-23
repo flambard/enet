@@ -572,7 +572,7 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
     %% - Send the commands as individual events to ourselves
     %%
     #state{ ip = IP, port = Port } = S,
-    {ok, Commands} = wire_protocol_decode:commands(Packet),
+    {ok, Commands} = enet_protocol_decode:commands(Packet),
     lists:foreach(
       fun ({H = #command_header{ please_acknowledge = 0 }, C}) ->
               %%

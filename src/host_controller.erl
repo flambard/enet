@@ -219,7 +219,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
        owner = Owner,
        peer_sup = Sup
       } = S,
-    {ok, PH, Rest} = wire_protocol_decode:protocol_header(Packet),
+    {ok, PH, Rest} = enet_protocol_decode:protocol_header(Packet),
     Commands =
         case PH#protocol_header.compressed of
             0 -> Rest;
