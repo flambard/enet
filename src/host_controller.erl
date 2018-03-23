@@ -324,7 +324,7 @@ get_time() ->
     erlang:system_time(1000) band 16#FFFF.
 
 start_peer(Table, PeerSup, LocalOrRemote, Host, N, PeerID, IP, Port, Owner) ->
-    {ok, PCSup} = peer_sup:start_peer_channel_supervisor(PeerSup, PeerID),
+    {ok, PCSup} = enet_peer_sup:start_peer_channel_supervisor(PeerSup, PeerID),
     {ok, ChannelSup} = enet_peer_channel_sup:start_channel_supervisor(PCSup),
     {ok, Pid} =
         enet_peer_channel_sup:start_peer_controller(

@@ -21,16 +21,16 @@ start_link() ->
 
 start_peer_supervisor(Supervisor) ->
     Child = #{
-      id => peer_sup,
+      id => enet_peer_sup,
       start => {
-        peer_sup,
+        enet_peer_sup,
         start_link,
         []
        },
       restart => permanent,
       shutdown => infinity,
       type => supervisor,
-      modules => [peer_sup]
+      modules => [enet_peer_sup]
      },
     supervisor:start_child(Supervisor, Child).
 
