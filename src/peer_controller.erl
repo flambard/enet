@@ -212,8 +212,8 @@ connecting(send_connect, S) ->
           S#state.packet_throttle_acceleration,
           S#state.packet_throttle_deceleration,
           ConnectID),
-    HBin = wire_protocol_encode:command_header(ConnectH),
-    CBin = wire_protocol_encode:command(ConnectC),
+    HBin = enet_protocol_encode:command_header(ConnectH),
+    CBin = enet_protocol_encode:command(ConnectC),
     {sent_time, _ConnectSentTime} =
         host_controller:send_outgoing_commands(Host, [HBin, CBin], IP, Port),
     {next_state, connecting, S, ?PEER_TIMEOUT_MINIMUM};
@@ -275,8 +275,8 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
                                              HostChannelLimit,
                                              HostIncomingBandwidth,
                                              HostOutgoingBandwidth),
-    HBin = wire_protocol_encode:command_header(VCH),
-    CBin = wire_protocol_encode:command(VCC),
+    HBin = enet_protocol_encode:command_header(VCH),
+    CBin = enet_protocol_encode:command(VCC),
     {sent_time, _VerifyConnectSentTime} =
         host_controller:send_outgoing_commands(
           Host, [HBin, CBin], IP, Port, RemotePeerID),
@@ -492,8 +492,8 @@ connected({outgoing_command, {H, C = #send_unsequenced{}}}, S) ->
     #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = S,
     Group = S#state.outgoing_unsequenced_group + 1,
     C1 = C#send_unsequenced{ unsequenced_group = Group },
-    HBin = wire_protocol_encode:command_header(H),
-    CBin = wire_protocol_encode:command(C1),
+    HBin = enet_protocol_encode:command_header(H),
+    CBin = enet_protocol_encode:command(C1),
     {sent_time, _SentTime} =
         host_controller:send_outgoing_commands(
           S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
@@ -507,8 +507,8 @@ connected({outgoing_command, {H, C = #send_unreliable{}}}, S) ->
     %% TODO: Describe.
     %%
     #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = S,
-    HBin = wire_protocol_encode:command_header(H),
-    CBin = wire_protocol_encode:command(C),
+    HBin = enet_protocol_encode:command_header(H),
+    CBin = enet_protocol_encode:command(C),
     {sent_time, _SentTime} =
         host_controller:send_outgoing_commands(
           S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
@@ -521,8 +521,8 @@ connected({outgoing_command, {H, C = #send_reliable{}}}, S) ->
     %% TODO: Describe.
     %%
     #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = S,
-    HBin = wire_protocol_encode:command_header(H),
-    CBin = wire_protocol_encode:command(C),
+    HBin = enet_protocol_encode:command_header(H),
+    CBin = enet_protocol_encode:command(C),
     {sent_time, _SentTime} =
         host_controller:send_outgoing_commands(
           S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
@@ -537,8 +537,8 @@ connected(disconnect, State) ->
     %%
     #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = State,
     {H, C} = enet_command:sequenced_disconnect(),
-    HBin = wire_protocol_encode:command_header(H),
-    CBin = wire_protocol_encode:command(C),
+    HBin = enet_protocol_encode:command_header(H),
+    CBin = enet_protocol_encode:command(C),
     host_controller:send_outgoing_commands(
       State#state.host, [HBin, CBin], IP, Port, RemotePeerID),
     {next_state, disconnecting, State}.
@@ -590,8 +590,8 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
               %%
               Host = S#state.host,
               {AckH, AckC} = enet_command:acknowledge(H, SentTime),
-              HBin = wire_protocol_encode:command_header(AckH),
-              CBin = wire_protocol_encode:command(AckC),
+              HBin = enet_protocol_encode:command_header(AckH),
+              CBin = enet_protocol_encode:command(AckC),
               RemotePeerID =
                   case C of
                       #connect{}        -> C#connect.outgoing_peer_id;

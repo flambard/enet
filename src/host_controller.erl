@@ -187,7 +187,7 @@ handle_call({send_outgoing_commands, Commands, IP, Port, ID}, _From, S) ->
             peer_id = ID,
             sent_time = SentTime
            },
-    Packet = [wire_protocol_encode:protocol_header(PH), Commands],
+    Packet = [enet_protocol_encode:protocol_header(PH), Commands],
     ok = gen_udp:send(S#state.socket, IP, Port, Packet),
     {reply, {sent_time, SentTime}, S}.
 
@@ -283,9 +283,9 @@ handle_info({'DOWN', _Ref, process, Pid, _Reason}, S) ->
                    },
             {CH, Command} = enet_command:unsequenced_disconnect(),
             Packet = [
-                      wire_protocol_encode:protocol_header(PH),
-                      wire_protocol_encode:command_header(CH),
-                      wire_protocol_encode:command(Command)
+                      enet_protocol_encode:protocol_header(PH),
+                      enet_protocol_encode:command_header(CH),
+                      enet_protocol_encode:command(Command)
                      ],
             ok = gen_udp:send(Socket, IP, Port, Packet)
     end,

@@ -1,4 +1,4 @@
--module(wire_protocol_encode).
+-module(enet_protocol_encode).
 
 -include("protocol.hrl").
 -include("commands.hrl").
