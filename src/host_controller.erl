@@ -325,9 +325,9 @@ get_time() ->
 
 start_peer(Table, PeerSup, LocalOrRemote, Host, N, PeerID, IP, Port, Owner) ->
     {ok, PCSup} = peer_sup:start_peer_channel_supervisor(PeerSup, PeerID),
-    {ok, ChannelSup} = peer_channel_sup:start_channel_supervisor(PCSup),
+    {ok, ChannelSup} = enet_peer_channel_sup:start_channel_supervisor(PCSup),
     {ok, Pid} =
-        peer_channel_sup:start_peer_controller(
+        enet_peer_channel_sup:start_peer_controller(
           PCSup, LocalOrRemote, Host, ChannelSup, N, PeerID, IP, Port, Owner),
     monitor(process, Pid),
     true = gproc:reg_other({n, l, {sup_of_peer, Pid}}, PCSup),

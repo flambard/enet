@@ -22,14 +22,14 @@ start_peer_channel_supervisor(Supervisor, ID) ->
     Child = #{
       id => ID,
       start => {
-        peer_channel_sup,
+        enet_peer_channel_sup,
         start_link,
         []
        },
       restart => temporary,
       shutdown => infinity,
       type => supervisor,
-      modules => [peer_channel_sup]
+      modules => [enet_peer_channel_sup]
      },
     supervisor:start_child(Supervisor, Child).
 

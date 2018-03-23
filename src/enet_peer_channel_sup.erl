@@ -1,4 +1,4 @@
--module(peer_channel_sup).
+-module(enet_peer_channel_sup).
 -behaviour(supervisor).
 
 %% API
