@@ -497,14 +497,19 @@ connected({outgoing_command, {H, C = #send_unsequenced{}}}, S) ->
     %% - Set unsequenced_group on command to outgoing_unsequenced_group
     %% - Queue the command for sending
     %%
-    #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = S,
+    #state{
+       host = Host,
+       ip = IP,
+       port = Port,
+       remote_peer_id = RemotePeerID
+      } = S,
     Group = S#state.outgoing_unsequenced_group + 1,
     C1 = C#send_unsequenced{ unsequenced_group = Group },
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C1),
     {sent_time, _SentTime} =
         enet_host:send_outgoing_commands(
-          S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
+          Host, [HBin, CBin], IP, Port, RemotePeerID),
     NewS = S#state{ outgoing_unsequenced_group = Group },
     {next_state, connected, NewS};
 
@@ -514,12 +519,17 @@ connected({outgoing_command, {H, C = #send_unreliable{}}}, S) ->
     %%
     %% TODO: Describe.
     %%
-    #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = S,
+    #state{
+       host = Host,
+       ip = IP,
+       port = Port,
+       remote_peer_id = RemotePeerID
+      } = S,
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C),
     {sent_time, _SentTime} =
         enet_host:send_outgoing_commands(
-          S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
+          Host, [HBin, CBin], IP, Port, RemotePeerID),
     {next_state, connected, S};
 
 connected({outgoing_command, {H, C = #send_reliable{}}}, S) ->
@@ -528,12 +538,17 @@ connected({outgoing_command, {H, C = #send_reliable{}}}, S) ->
     %%
     %% TODO: Describe.
     %%
-    #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = S,
+    #state{
+       host = Host,
+       ip = IP,
+       port = Port,
+       remote_peer_id = RemotePeerID
+      } = S,
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C),
     {sent_time, _SentTime} =
         enet_host:send_outgoing_commands(
-          S#state.host, [HBin, CBin], IP, Port, RemotePeerID),
+          Host, [HBin, CBin], IP, Port, RemotePeerID),
     {next_state, connected, S};
 
 connected(disconnect, State) ->
@@ -543,12 +558,17 @@ connected(disconnect, State) ->
     %% - Queue a Disconnect command for sending
     %% - Change state to 'disconnecting'
     %%
-    #state{ ip = IP, port = Port, remote_peer_id = RemotePeerID } = State,
+    #state{
+       host = Host,
+       ip = IP,
+       port = Port,
+       remote_peer_id = RemotePeerID
+      } = State,
     {H, C} = enet_command:sequenced_disconnect(),
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C),
     enet_host:send_outgoing_commands(
-      State#state.host, [HBin, CBin], IP, Port, RemotePeerID),
+      Host, [HBin, CBin], IP, Port, RemotePeerID),
     {next_state, disconnecting, State}.
 
 
