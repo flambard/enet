@@ -148,9 +148,10 @@ init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
     %% - Send a Connect command to the remote peer (use peer ID)
     %% - Start in the 'connecting' state
     %%
+    ok = gen_fsm:send_event(self(), send_connect),
     Channels = start_channels(ChannelSup, N, Owner),
     <<ConnectID:32>> = crypto:strong_rand_bytes(4),
-    ok = gen_fsm:send_event(self(), send_connect),
+    gproc:reg({p, l, remote_host_port}, Port),
     S = #state{
            owner = Owner,
            channel_sup = ChannelSup,
@@ -167,6 +168,7 @@ init({remote_connect, Host, ChannelSup, _N, PeerID, IP, Port, Owner}) ->
     %%
     %% Describe
     %%
+    gproc:reg({p, l, remote_host_port}, Port),
     S = #state{
            owner = Owner,
            host = Host,
