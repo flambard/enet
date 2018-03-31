@@ -15,6 +15,7 @@
          set_remote_peer_id/2,
          send_outgoing_commands/4,
          send_outgoing_commands/5,
+         get_port/1,
          get_incoming_bandwidth/1,
          get_outgoing_bandwidth/1,
          get_mtu/1,
@@ -81,6 +82,9 @@ send_outgoing_commands(Host, Commands, IP, Port) ->
 send_outgoing_commands(Host, Commands, IP, Port, PeerID) ->
     gen_server:call(Host, {send_outgoing_commands, Commands, IP, Port, PeerID}).
 
+get_port(Host) ->
+    gproc:get_value({p, l, port}, Host).
+
 get_incoming_bandwidth(Host) ->
     gproc:get_value({p, l, incoming_bandwidth}, Host).
 
@@ -121,6 +125,7 @@ init({Owner, Port, PeerSup, Options}) ->
         end,
     true = gproc:mreg(p, l,
                       [
+                       {port, Port},
                        {channel_limit, ChannelLimit},
                        {incoming_bandwidth, IncomingBandwidth},
                        {outgoing_bandwidth, OutgoingBandwidth},
