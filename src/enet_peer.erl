@@ -585,7 +585,10 @@ disconnecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %% - Stop
     %%
     S#state.owner ! {enet, disconnected, local, self(), S#state.connect_id},
-    {stop, normal, S}.
+    {stop, normal, S};
+
+disconnecting(_Command, S) ->
+    {next_state, disconnecting, S}.
 
 
 %%%
