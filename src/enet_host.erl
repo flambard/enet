@@ -164,7 +164,7 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
             {error, table_full} -> {error, reached_peer_limit};
             {ok, PeerID}        ->
                 start_peer(
-                  Table, Sup, local, self(), Channels, PeerID, IP, Port, Owner)
+                  Table, Sup, local, Channels, PeerID, IP, Port, Owner)
         end,
     {reply, Reply, S};
 
@@ -224,14 +224,20 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
        owner = Owner,
        peer_sup = Sup
       } = S,
-    {ok, PH, Rest} = enet_protocol_decode:protocol_header(Packet),
+    %% TODO: Replace call to enet_protocol_decode with binary pattern match.
+    {ok,
+     #protocol_header{
+        compressed = IsCompressed,
+        peer_id = RecipientPeerID,
+        sent_time = SentTime
+       },
+     Rest} = enet_protocol_decode:protocol_header(Packet),
     Commands =
-        case PH#protocol_header.compressed of
+        case IsCompressed of
             0 -> Rest;
             1 -> Decompress(Rest)
         end,
-    SentTime = PH#protocol_header.sent_time,
-    case PH#protocol_header.peer_id of
+    case RecipientPeerID of
         ?NULL_PEER_ID ->
             %% No particular peer is the receiver of this packet.
             %% Create a new peer.
@@ -240,15 +246,9 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                 {ok, PeerID}        ->
                     %% Channel count is included in the Connect command
                     N = undefined,
-                    {ok, Pid} = start_peer(PeerTable,
-                                           Sup,
-                                           remote,
-                                           self(),
-                                           N,
-                                           PeerID,
-                                           IP,
-                                           Port,
-                                           Owner),
+                    {ok, Pid} =
+                        start_peer(
+                          PeerTable, Sup, remote, N, PeerID, IP, Port, Owner),
                     ok = enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
             end;
         PeerID ->
@@ -328,12 +328,12 @@ code_change(_OldVsn, State, _Extra) ->
 get_time() ->
     erlang:system_time(1000) band 16#FFFF.
 
-start_peer(Table, PeerSup, LocalOrRemote, Host, N, PeerID, IP, Port, Owner) ->
+start_peer(Table, PeerSup, LocalOrRemote, N, PeerID, IP, Port, Owner) ->
     {ok, PCSup} = enet_peer_sup:start_peer_channel_supervisor(PeerSup, PeerID),
     {ok, ChannelSup} = enet_peer_channel_sup:start_channel_supervisor(PCSup),
     {ok, Pid} =
         enet_peer_channel_sup:start_peer(
-          PCSup, LocalOrRemote, Host, ChannelSup, N, PeerID, IP, Port, Owner),
+          PCSup, LocalOrRemote, self(), ChannelSup, N, PeerID, IP, Port, Owner),
     monitor(process, Pid),
     true = gproc:reg_other({n, l, {sup_of_peer, Pid}}, PCSup),
     _Ref = gproc:monitor({n, l, {sup_of_peer, Pid}}),
