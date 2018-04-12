@@ -35,6 +35,7 @@
         {
           connect_id,
           pid,
+          channel_count,
           channels = #{}
         }).
 
@@ -144,7 +145,7 @@ next_state(S, _V, {call, enet_sync, stop_host, [Port]}) ->
               TheOtherHosts),
     S#state{ hosts = Hosts };
 
-next_state(S, V, {call, enet_sync, connect, [HostPid, Port, _ChannelCount]}) ->
+next_state(S, V, {call, enet_sync, connect, [HostPid, Port, ChannelCount]}) ->
     case {get_host_with_pid(S, HostPid), get_host_with_port(S, Port)} of
         {_, #host{ peer_limit = L, peer_count = L }} ->
             %% Trying to connect to a full remote host -> timeout
@@ -165,11 +166,13 @@ next_state(S, V, {call, enet_sync, connect, [HostPid, Port, _ChannelCount]}) ->
             Peer1 = #peer{
                        connect_id = ConnectID,
                        pid = PeerPid,
+                       channel_count = ChannelCount,
                        channels = Channels
                       },
             Peer2 = #peer{
                        connect_id = ConnectID,
                        pid = RemotePeerPid,
+                       channel_count = ChannelCount,
                        channels = RemoteChannels
                       },
             NewH1 = H1#host{
@@ -189,11 +192,13 @@ next_state(S, V, {call, enet_sync, connect, [HostPid, Port, _ChannelCount]}) ->
             Peer1 = #peer{
                        connect_id = ConnectID,
                        pid = PeerPid,
+                       channel_count = ChannelCount,
                        channels = Channels
                       },
             Peer2 = #peer{
                        connect_id = ConnectID,
                        pid = RemotePeerPid,
+                       channel_count = ChannelCount,
                        channels = RemoteChannels
                       },
             NewH1 = H1#host{
@@ -357,10 +362,14 @@ connect_id(#state{ hosts = Hosts }) ->
 
 
 channel_pid(#state{ hosts = Hosts }) ->
-    ?LET(#host{ peers = Peers}, oneof(Hosts),
-         ?LET(#peer{ channels = Channels }, oneof(Peers),
-              ?LET(ID, integer(1, size(Channels)),
-                   maps:find(ID, Channels)))).
+    ?LET(#host{ peers = Peers },
+         ?SUCHTHAT(#host{ peers = Peers }, oneof(Hosts),
+                   Peers =/= []),
+         ?LET(#peer{ channels = Channels, channel_count = Count }, oneof(Peers),
+              ?LET(ID, integer(0, Count - 1),
+                   {call, erlang, element,
+                    [2, {call, maps, find, [ID, Channels]}]}))).
+
 
 channel_count(Limit) ->
     integer(1, Limit).
