@@ -45,7 +45,7 @@ disconnect(LPid, RPid) ->
                         {'DOWN', Ref1, process, LPid, normal} ->
                             receive
                                 {'DOWN', Ref2, process, RPid, normal} ->
-                                    receive after 200 -> ok end
+                                    receive after 500 -> ok end
                             after 1000 ->
                                     {error, remote_timeout}
                             end
