@@ -80,8 +80,9 @@ command(S) ->
                end)
           || Peers =/= []]
 
-      %% ++ [{call, enet, send_unsequenced, [channel_pid(S), message_data()]}
-      %%     || S#state.peers =/= []]
+      ++ [{call, enet_sync, send_unsequenced, [channel_pid(S), message_data()]}
+          || Peers =/= []]
+
       %% ++ [{call, enet, send_unreliable, [channel_pid(S), message_data()]}
       %%     || S#state.peers =/= []]
       %% ++ [{call, enet, send_reliable, [channel_pid(S), message_data()]}
@@ -309,7 +310,7 @@ prop_sync_loopback() ->
                   begin
                       {History, S, Res} = run_commands(?MODULE, Cmds),
                       lists:foreach(
-                        fun(#host{ port = Port, pid = Pid }) ->
+                        fun(#host{ port = Port }) ->
                                 case enet_sync:stop_host(Port) of
                                     ok              -> ok;
                                     {error, Reason} ->

@@ -1,9 +1,12 @@
 -module(enet_sync).
 
+-include("../enet_commands.hrl").
+
 -export([
          connect/3,
          disconnect/2,
-         stop_host/1
+         stop_host/1,
+         send_unsequenced/2
         ]).
 
 
@@ -41,7 +44,8 @@ disconnect(LPid, RPid) ->
                     receive
                         {'DOWN', Ref1, process, LPid, normal} ->
                             receive
-                                {'DOWN', Ref2, process, RPid, normal} -> ok
+                                {'DOWN', Ref2, process, RPid, normal} ->
+                                    receive after 200 -> ok end
                             after 1000 ->
                                     {error, remote_timeout}
                             end
@@ -73,4 +77,13 @@ stop_host(Port) ->
                           PeerRefs)
     after 1000 ->
             {error, timeout}
+    end.
+
+send_unsequenced(Channel, Data) ->
+    enet:send_unsequenced(Channel, Data),
+    receive
+        {enet, _ID, #send_unsequenced{ data = Data }} ->
+            ok
+    after 1000 ->
+            {error, data_not_received}
     end.
