@@ -21,16 +21,16 @@ start_link() ->
 
 start_channel_supervisor(Supervisor) ->
     Child = #{
-      id => channel_sup,
+      id => enet_channel_sup,
       start => {
-        channel_sup,
+        enet_channel_sup,
         start_link,
         []
        },
       restart => permanent,
       shutdown => infinity,
       type => supervisor,
-      modules => [channel_sup]
+      modules => [enet_channel_sup]
      },
     supervisor:start_child(Supervisor, Child).
 

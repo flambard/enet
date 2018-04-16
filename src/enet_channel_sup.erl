@@ -21,11 +21,11 @@ start_link() ->
 start_channel(Supervisor, ID, Peer, Owner) ->
     Child = #{
       id => ID,
-      start => { channel, start_link, [ID, Peer, Owner] },
+      start => { enet_channel, start_link, [ID, Peer, Owner] },
       restart => permanent,
       shutdown => 500,
       type => worker,
-      modules => [channel]
+      modules => [enet_channel]
      },
     supervisor:start_child(Supervisor, Child).
 
