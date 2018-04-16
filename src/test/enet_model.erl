@@ -83,10 +83,11 @@ command(S) ->
       ++ [{call, enet_sync, send_unsequenced, [channel_pid(S), message_data()]}
           || Peers =/= []]
 
-      %% ++ [{call, enet, send_unreliable, [channel_pid(S), message_data()]}
-      %%     || S#state.peers =/= []]
-      %% ++ [{call, enet, send_reliable, [channel_pid(S), message_data()]}
-      %%     || S#state.peers =/= []]).
+      ++ [{call, enet_sync, send_unreliable, [channel_pid(S), message_data()]}
+          || Peers =/= []]
+
+      ++ [{call, enet_sync, send_reliable, [channel_pid(S), message_data()]}
+          || Peers =/= []]
      ).
 
 
