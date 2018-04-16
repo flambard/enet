@@ -14,7 +14,14 @@
         ]).
 
 -export([
-         init/3
+         init/4
+        ]).
+
+-export([
+         system_code_change/4,
+         system_continue/3,
+         system_terminate/4,
+         write_debug/3
         ]).
 
 -record(state,
@@ -27,7 +34,9 @@
           outgoing_reliable_sequence_number = 0,
           outgoing_unreliable_sequence_number = 0,
           reliable_windows, %% reliableWindows [ENET_PEER_RELIABLE_WINDOWS] (uint16 * 16 = 32 bytes)
-          used_reliable_windows = 0
+          used_reliable_windows = 0,
+          sys_parent,
+          sys_debug
         }).
 
 
@@ -36,7 +45,7 @@
 %%%
 
 start_link(ID, Peer, Owner) ->
-    proc_lib:start_link(?MODULE, init, [ID, Peer, Owner]).
+    proc_lib:start_link(?MODULE, init, [ID, Peer, Owner, self()]).
 
 stop(Channel) ->
     Channel ! stop.
@@ -76,14 +85,26 @@ send_reliable(Channel, Data) ->
 %%% Implementation
 %%%
 
-init(ID, Peer, Owner) ->
-    State = #state{ id = ID, peer = Peer, owner = Owner },
-    proc_lib:init_ack({ok, self()}),
+init(ID, Peer, Owner, Parent) ->
+    Debug = sys:debug_options([]),
+    State = #state{
+               id = ID,
+               peer = Peer,
+               owner = Owner,
+               sys_parent = Parent,
+               sys_debug = Debug
+              },
+    proc_lib:init_ack(Parent, {ok, self()}),
     loop(State).
 
 
 loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
     receive
+
+        {system, From, Request} ->
+            #state{ sys_parent = Parent, sys_debug = Debug } = S,
+            sys:handle_system_msg(Request, From, Parent, ?MODULE, Debug, S);
+
         {recv_unsequenced, {
            #command_header{ unsequenced = 1 },
            C = #send_unsequenced{}
@@ -94,6 +115,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
             {H, C} = enet_command:send_unsequenced(ID, Data),
             ok = enet_peer:send_command(Peer, {H, C}),
             loop(S);
+
         {recv_unreliable, {
            #command_header{},
            C = #send_unreliable{ unreliable_sequence_number = N }
@@ -112,6 +134,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
             ok = enet_peer:send_command(Peer, {H, C}),
             NewS = S#state{ outgoing_unreliable_sequence_number = N + 1 },
             loop(NewS);
+
         {recv_reliable, {
            #command_header{ reliable_sequence_number = N },
            C = #send_reliable{}
@@ -125,6 +148,27 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
             ok = enet_peer:send_command(Peer, {H, C}),
             NewS = S#state{ outgoing_reliable_sequence_number = N + 1 },
             loop(NewS);
+
         stop ->
             stopped
     end.
+
+
+%%%
+%%% System message handling
+%%%
+
+write_debug(Dev, Event, Name) ->
+    io:format(Dev, "~p event = ~p~n", [Name, Event]).
+
+system_continue(_Parent, _Debug, State) ->
+    io:format("Continue!~n"),
+    loop(State).
+
+system_terminate(Reason, _Parent, _Debug, _State) ->
+    io:format("Terminate!~n"),
+    exit(Reason).
+
+system_code_change(State, _Module, _OldVsn, _Extra) ->
+    io:format("Changed code!~n"),
+    {ok, State}.
