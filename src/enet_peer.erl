@@ -449,7 +449,7 @@ connected({incoming_command, {H, C = #send_unsequenced{}}}, S) ->
     %%
     %% Received Send Unsequenced command.
     %%
-    %% TOOD: Describe.
+    %% TODO: Describe.
     %%
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
@@ -460,7 +460,7 @@ connected({incoming_command, {H, C = #send_unreliable{}}}, S) ->
     %%
     %% Received Send Unreliable command.
     %%
-    %% TOOD: Describe.
+    %% TODO: Describe.
     %%
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
@@ -471,7 +471,7 @@ connected({incoming_command, {H, C = #send_reliable{}}}, S) ->
     %%
     %% Received Send Reliable command.
     %%
-    %% TOOD: Describe.
+    %% TODO: Describe.
     %%
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
