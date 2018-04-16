@@ -6,7 +6,9 @@
          connect/3,
          disconnect/2,
          stop_host/1,
-         send_unsequenced/2
+         send_unsequenced/2,
+         send_unreliable/2,
+         send_reliable/2
         ]).
 
 
@@ -83,6 +85,24 @@ send_unsequenced(Channel, Data) ->
     enet:send_unsequenced(Channel, Data),
     receive
         {enet, _ID, #send_unsequenced{ data = Data }} ->
+            ok
+    after 1000 ->
+            {error, data_not_received}
+    end.
+
+send_unreliable(Channel, Data) ->
+    enet:send_unreliable(Channel, Data),
+    receive
+        {enet, _ID, #send_unreliable{ data = Data }} ->
+            ok
+    after 1000 ->
+            {error, data_not_received}
+    end.
+
+send_reliable(Channel, Data) ->
+    enet:send_reliable(Channel, Data),
+    receive
+        {enet, _ID, #send_reliable{ data = Data }} ->
             ok
     after 1000 ->
             {error, data_not_received}
