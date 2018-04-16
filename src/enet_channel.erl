@@ -98,7 +98,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
            #command_header{},
            C = #send_unreliable{ unreliable_sequence_number = N }
           }} ->
-            if N =< S#state.incoming_unreliable_sequence_number ->
+            if N < S#state.incoming_unreliable_sequence_number ->
                     %% Data is old - drop it and continue.
                     loop(S);
                true ->
