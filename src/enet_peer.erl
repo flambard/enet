@@ -11,7 +11,8 @@
          channels/1,
          get_connect_id/1,
          recv_incoming_packet/3,
-         send_command/2
+         send_command/2,
+         get_mtu/1
         ]).
 
 %% gen_fsm callbacks
@@ -136,6 +137,9 @@ recv_incoming_packet(Peer, SentTime, Packet) ->
 send_command(Peer, {H, C}) ->
     gen_fsm:send_event(Peer, {outgoing_command, {H, C}}).
 
+get_mtu(Peer) ->
+    gproc:get_value({p, l, mtu}, Peer).
+
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -201,6 +205,7 @@ connecting(send_connect, S) ->
     IncomingBandwidth = enet_host:get_incoming_bandwidth(Host),
     OutgoingBandwidth = enet_host:get_outgoing_bandwidth(Host),
     MTU = enet_host:get_mtu(Host),
+    gproc:reg({p, l, mtu}, MTU),
     {ConnectH, ConnectC} =
         enet_command:connect(
           PeerID,
@@ -246,7 +251,7 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
        outgoing_peer_id             = RemotePeerID,
        incoming_session_id          = _IncomingSessionID,
        outgoing_session_id          = _OutgoingSessionID,
-       mtu                          = _MTU,
+       mtu                          = MTU,
        window_size                  = WindowSize,
        channel_count                = ChannelCount,
        incoming_bandwidth           = IncomingBandwidth,
@@ -267,6 +272,11 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
        incoming_session_id = IncomingSessionID,
        outgoing_session_id = OutgoingSessionID
       } = S,
+    true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
+    true = gproc:mreg(p, l, [
+                             {mtu, MTU},
+                             {remote_peer_id, RemotePeerID}
+                            ]),
     HostChannelLimit = enet_host:get_channel_limit(Host),
     HostIncomingBandwidth = enet_host:get_incoming_bandwidth(Host),
     HostOutgoingBandwidth = enet_host:get_outgoing_bandwidth(Host),
@@ -282,8 +292,6 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
     {sent_time, _VerifyConnectSentTime} =
         enet_host:send_outgoing_commands(
           Host, [HBin, CBin], IP, Port, RemotePeerID),
-    true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
-    true = gproc:reg({p, l, remote_peer_id}, RemotePeerID),
     ok = enet_host:set_remote_peer_id(Host, RemotePeerID),
     Channels = start_channels(ChannelSup, ChannelCount, Owner),
     NewS = S#state{
