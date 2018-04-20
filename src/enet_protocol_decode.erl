@@ -139,7 +139,7 @@ command(?COMMAND_SEND_RELIABLE,
         ?SEND_RELIABLE(DataLength, DataRest)) ->
     <<Data:DataLength/binary, Rest/binary>> = DataRest,
     Command =
-        #send_reliable{
+        #reliable{
            data = Data
           },
     {ok, Command, Rest};
@@ -148,7 +148,7 @@ command(?COMMAND_SEND_UNRELIABLE,
         ?SEND_UNRELIABLE(UnreliableSequenceNumber, DataLength, DataRest)) ->
     <<Data:DataLength/binary, Rest/binary>> = DataRest,
     Command =
-        #send_unreliable{
+        #unreliable{
            unreliable_sequence_number = UnreliableSequenceNumber,
            data = Data
           },
@@ -158,7 +158,7 @@ command(?COMMAND_SEND_UNSEQUENCED,
         ?SEND_UNSEQUENCED(UnsequencedGroup, DataLength, DataRest)) ->
     <<Data:DataLength/binary, Rest/binary>> = DataRest,
     Command =
-        #send_unsequenced{
+        #unsequenced{
            unsequenced_group = UnsequencedGroup,
            data = Data
           },
@@ -170,7 +170,7 @@ command(?COMMAND_SEND_FRAGMENT,
            TotalLength, FragmentOffset, DataRest)) ->
     <<Data:DataLength/binary, Rest/binary>> = DataRest,
     Command =
-        #send_fragment{
+        #fragment{
            start_sequence_number = StartSequenceNumber,
            fragment_count = FragmentCount,
            fragment_number = FragmentNumber,

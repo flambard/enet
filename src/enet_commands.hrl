@@ -98,8 +98,9 @@
 %% Send Reliable Command
 %%
 
--record(send_reliable,
-        { data = <<>>
+-record(reliable,
+        {
+          data = <<>>
         }).
 
 
@@ -107,9 +108,10 @@
 %% Send Unreliable Command
 %%
 
--record(send_unreliable,
-        { unreliable_sequence_number = 0
-        , data                       = <<>>
+-record(unreliable,
+        {
+          unreliable_sequence_number = 0,
+          data                       = <<>>
         }).
 
 
@@ -117,9 +119,10 @@
 %% Send Unsequenced Command
 %%
 
--record(send_unsequenced,
-        { unsequenced_group = 0
-        , data              = <<>>
+-record(unsequenced,
+        {
+          unsequenced_group = 0,
+          data              = <<>>
         }).
 
 
@@ -127,13 +130,14 @@
 %% Send Fragment Command
 %%
 
--record(send_fragment,
-        { start_sequence_number = 0
-        , fragment_count        = 0
-        , fragment_number       = 0
-        , total_length          = 0
-        , fragment_offset       = 0
-        , data                  = <<>>
+-record(fragment,
+        {
+          start_sequence_number = 0,
+          fragment_count        = 0,
+          fragment_number       = 0,
+          total_length          = 0,
+          fragment_offset       = 0,
+          data                  = <<>>
         }).
 
 

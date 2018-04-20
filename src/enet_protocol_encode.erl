@@ -88,28 +88,28 @@ command(C = #disconnect{}) ->
 command(#ping{}) ->
     ?PING(<<>>);
 
-command(C = #send_reliable{}) ->
-    ?SEND_RELIABLE(byte_size(C#send_reliable.data),
-                   C#send_reliable.data);
+command(C = #reliable{}) ->
+    ?SEND_RELIABLE(byte_size(C#reliable.data),
+                   C#reliable.data);
 
-command(C = #send_unreliable{}) ->
-    ?SEND_UNRELIABLE(C#send_unreliable.unreliable_sequence_number,
-                     byte_size(C#send_unreliable.data),
-                     C#send_unreliable.data);
+command(C = #unreliable{}) ->
+    ?SEND_UNRELIABLE(C#unreliable.unreliable_sequence_number,
+                     byte_size(C#unreliable.data),
+                     C#unreliable.data);
 
-command(C = #send_unsequenced{}) ->
-    ?SEND_UNSEQUENCED(C#send_unsequenced.unsequenced_group,
-                      byte_size(C#send_unsequenced.data),
-                      C#send_unsequenced.data);
+command(C = #unsequenced{}) ->
+    ?SEND_UNSEQUENCED(C#unsequenced.unsequenced_group,
+                      byte_size(C#unsequenced.data),
+                      C#unsequenced.data);
 
-command(C = #send_fragment{}) ->
-    ?SEND_FRAGMENT(C#send_fragment.start_sequence_number,
-                   byte_size(C#send_fragment.data),
-                   C#send_fragment.fragment_count,
-                   C#send_fragment.fragment_number,
-                   C#send_fragment.total_length,
-                   C#send_fragment.fragment_offset,
-                   C#send_fragment.data);
+command(C = #fragment{}) ->
+    ?SEND_FRAGMENT(C#fragment.start_sequence_number,
+                   byte_size(C#fragment.data),
+                   C#fragment.fragment_count,
+                   C#fragment.fragment_number,
+                   C#fragment.total_length,
+                   C#fragment.fragment_offset,
+                   C#fragment.data);
 
 command(C = #bandwidth_limit{}) ->
     ?BANDWIDTH_LIMIT(C#bandwidth_limit.incoming_bandwidth,

@@ -453,7 +453,7 @@ connected({incoming_command, {_H, C = #throttle_configure{}}}, S) ->
             },
     {next_state, connected, NewS};
 
-connected({incoming_command, {H, C = #send_unsequenced{}}}, S) ->
+connected({incoming_command, {H, C = #unsequenced{}}}, S) ->
     %%
     %% Received Send Unsequenced command.
     %%
@@ -464,7 +464,7 @@ connected({incoming_command, {H, C = #send_unsequenced{}}}, S) ->
     ok = enet_channel:recv_unsequenced(Channel, {H, C}),
     {next_state, connected, S};
 
-connected({incoming_command, {H, C = #send_unreliable{}}}, S) ->
+connected({incoming_command, {H, C = #unreliable{}}}, S) ->
     %%
     %% Received Send Unreliable command.
     %%
@@ -475,7 +475,7 @@ connected({incoming_command, {H, C = #send_unreliable{}}}, S) ->
     ok = enet_channel:recv_unreliable(Channel, {H, C}),
     {next_state, connected, S};
 
-connected({incoming_command, {H, C = #send_reliable{}}}, S) ->
+connected({incoming_command, {H, C = #reliable{}}}, S) ->
     %%
     %% Received Send Reliable command.
     %%
@@ -496,7 +496,7 @@ connected({incoming_command, {_H, #disconnect{}}}, S) ->
     S#state.owner ! {enet, disconnected, remote, self(), S#state.connect_id},
     {stop, normal, S};
 
-connected({outgoing_command, {H, C = #send_unsequenced{}}}, S) ->
+connected({outgoing_command, {H, C = #unsequenced{}}}, S) ->
     %%
     %% Sending an Unsequenced, unreliable command.
     %%
@@ -512,7 +512,7 @@ connected({outgoing_command, {H, C = #send_unsequenced{}}}, S) ->
        remote_peer_id = RemotePeerID
       } = S,
     Group = S#state.outgoing_unsequenced_group + 1,
-    C1 = C#send_unsequenced{ unsequenced_group = Group },
+    C1 = C#unsequenced{ unsequenced_group = Group },
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C1),
     {sent_time, _SentTime} =
@@ -521,7 +521,7 @@ connected({outgoing_command, {H, C = #send_unsequenced{}}}, S) ->
     NewS = S#state{ outgoing_unsequenced_group = Group },
     {next_state, connected, NewS};
 
-connected({outgoing_command, {H, C = #send_unreliable{}}}, S) ->
+connected({outgoing_command, {H, C = #unreliable{}}}, S) ->
     %%
     %% Sending a Sequenced, unreliable command.
     %%
@@ -540,7 +540,7 @@ connected({outgoing_command, {H, C = #send_unreliable{}}}, S) ->
           Host, [HBin, CBin], IP, Port, RemotePeerID),
     {next_state, connected, S};
 
-connected({outgoing_command, {H, C = #send_reliable{}}}, S) ->
+connected({outgoing_command, {H, C = #reliable{}}}, S) ->
     %%
     %% Sending a Sequenced, reliable command.
     %%

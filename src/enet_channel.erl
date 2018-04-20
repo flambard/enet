@@ -107,7 +107,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
 
         {recv_unsequenced, {
            #command_header{ unsequenced = 1 },
-           C = #send_unsequenced{}
+           C = #unsequenced{}
           }} ->
             Owner ! {enet, ID, C},
             loop(S);
@@ -118,7 +118,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
 
         {recv_unreliable, {
            #command_header{},
-           C = #send_unreliable{ unreliable_sequence_number = N }
+           C = #unreliable{ unreliable_sequence_number = N }
           }} ->
             if N < S#state.incoming_unreliable_sequence_number ->
                     %% Data is old - drop it and continue.
@@ -137,7 +137,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
 
         {recv_reliable, {
            #command_header{ reliable_sequence_number = N },
-           C = #send_reliable{}
+           C = #reliable{}
           }} when N =:= S#state.incoming_reliable_sequence_number ->
             Owner ! {enet, ID, C},
             NewS = S#state{ incoming_reliable_sequence_number = N + 1 },

@@ -126,7 +126,7 @@ send_unsequenced(ChannelID, Data) ->
          command = ?COMMAND_SEND_UNSEQUENCED,
          channel_id = ChannelID
         },
-      #send_unsequenced{
+      #unsequenced{
          data = Data
         }
     }.
@@ -137,7 +137,7 @@ send_unreliable(ChannelID, UnreliableSequenceNumber, Data) ->
          command = ?COMMAND_SEND_UNRELIABLE,
          channel_id = ChannelID
         },
-      #send_unreliable{
+      #unreliable{
          unreliable_sequence_number = UnreliableSequenceNumber,
          data = Data
         }
@@ -150,7 +150,7 @@ send_reliable(ChannelID, ReliableSequenceNumber, Data) ->
          channel_id = ChannelID,
          reliable_sequence_number = ReliableSequenceNumber
         },
-      #send_reliable{
+      #reliable{
          data = Data
         }
     }.
