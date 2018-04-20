@@ -57,7 +57,8 @@
           incoming_unsequenced_group = 0,
           outgoing_unsequenced_group = 1,
           unsequenced_window = 0,
-          connect_id
+          connect_id,
+          resend_timers = #{}
         }).
 
 
@@ -205,7 +206,8 @@ connecting(send_connect, S) ->
        packet_throttle_acceleration = PacketThrottleAcceleration,
        packet_throttle_deceleration = PacketThrottleDeceleration,
        outgoing_reliable_sequence_number = SequenceNumber,
-       connect_id = ConnectID
+       connect_id = ConnectID,
+       resend_timers = ResendTimers
       } = S,
     IncomingBandwidth = enet_host:get_incoming_bandwidth(Host),
     OutgoingBandwidth = enet_host:get_outgoing_bandwidth(Host),
@@ -227,19 +229,43 @@ connecting(send_connect, S) ->
           SequenceNumber),
     HBin = enet_protocol_encode:command_header(ConnectH),
     CBin = enet_protocol_encode:command(ConnectC),
-    {sent_time, _ConnectSentTime} =
+    {sent_time, ConnectSentTime} =
         enet_host:send_outgoing_commands(Host, [HBin, CBin], IP, Port),
-    NewS = S#state{ outgoing_reliable_sequence_number = SequenceNumber + 1 },
+    Key = {16#FF, ConnectSentTime, SequenceNumber},
+    RTs = maps:put(Key, mock_timer, ResendTimers),
+    NewS = S#state{
+             outgoing_reliable_sequence_number = SequenceNumber + 1,
+             resend_timers = RTs
+            },
     {next_state, connecting, NewS, ?PEER_TIMEOUT_MINIMUM};
 
-connecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
+connecting({incoming_command, {H, C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command in the 'connecting' state.
     %%
-    %% - Verify that the acknowledge is correct (TODO)
+    %% - Verify that the acknowledge is correct
     %% - Change state to 'acknowledging_verify_connect'
     %%
-    {next_state, acknowledging_verify_connect, S, ?PEER_TIMEOUT_MINIMUM}.
+    #state{ resend_timers = ResendTimers } = S,
+    #command_header{ channel_id = ChannelID } = H,
+    #acknowledge{
+       received_reliable_sequence_number = SequenceNumber,
+       received_sent_time                = SentTime
+      } = C,
+    Key = {ChannelID, SentTime, SequenceNumber},
+    case maps:take(Key, ResendTimers) of
+        error    -> {stop, unexpected_ack, S};
+        {_, RTs} ->
+            {
+              next_state,
+              acknowledging_verify_connect,
+              S#state{ resend_timers = RTs },
+              ?PEER_TIMEOUT_MINIMUM
+            }
+    end;
+
+connecting(timeout, S) ->
+    {stop, timeout, S}.
 
 
 %%%
