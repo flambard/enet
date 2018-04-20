@@ -5,8 +5,8 @@
 
 -export([
          acknowledge/2,
-         connect/11,
-         verify_connect/7,
+         connect/12,
+         verify_connect/8,
          sequenced_disconnect/0,
          unsequenced_disconnect/0,
          send_unsequenced/2,
@@ -38,13 +38,15 @@ connect(OutgoingPeerID,
         PacketThrottleInterval,
         PacketThrottleAcceleration,
         PacketThrottleDeceleration,
-        ConnectID) ->
+        ConnectID,
+        OutgoingReliableSequenceNumber) ->
     WindowSize = calculate_initial_window_size(OutgoingBandwidth),
     {
       #command_header{
          command = ?COMMAND_CONNECT,
          channel_id = 16#FF,
-         please_acknowledge = 1
+         please_acknowledge = 1,
+         reliable_sequence_number = OutgoingReliableSequenceNumber
         },
       #connect{
          outgoing_peer_id = OutgoingPeerID,
@@ -70,7 +72,8 @@ verify_connect(C = #connect{},
                OutgoingSessionID,
                HostChannelLimit,
                IncomingBandwidth,
-               OutgoingBandwidth) ->
+               OutgoingBandwidth,
+               OutgoingReliableSequenceNumber) ->
     WindowSize =
         calculate_window_size(IncomingBandwidth, C#connect.window_size),
     ISID =
@@ -81,7 +84,8 @@ verify_connect(C = #connect{},
       #command_header{
          command = ?COMMAND_VERIFY_CONNECT,
          channel_id = 16#FF,
-         please_acknowledge = 1
+         please_acknowledge = 1,
+         reliable_sequence_number = OutgoingReliableSequenceNumber
         },
       #verify_connect{
          outgoing_peer_id = OutgoingPeerID,

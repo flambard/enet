@@ -53,6 +53,7 @@
           packet_throttle_interval = ?PEER_PACKET_THROTTLE_INTERVAL,
           packet_throttle_acceleration = ?PEER_PACKET_THROTTLE_ACCELERATION,
           packet_throttle_deceleration = ?PEER_PACKET_THROTTLE_DECELERATION,
+          outgoing_reliable_sequence_number = 1,
           incoming_unsequenced_group = 0,
           outgoing_unsequenced_group = 0,
           unsequenced_window = 0,
@@ -200,6 +201,7 @@ connecting(send_connect, S) ->
        peer_id = PeerID,
        incoming_session_id = IncomingSessionID,
        outgoing_session_id = OutgoingSessionID,
+       outgoing_reliable_sequence_number = SequenceNumber,
        connect_id = ConnectID
       } = S,
     IncomingBandwidth = enet_host:get_incoming_bandwidth(Host),
@@ -218,12 +220,14 @@ connecting(send_connect, S) ->
           S#state.packet_throttle_interval,
           S#state.packet_throttle_acceleration,
           S#state.packet_throttle_deceleration,
-          ConnectID),
+          ConnectID,
+          SequenceNumber),
     HBin = enet_protocol_encode:command_header(ConnectH),
     CBin = enet_protocol_encode:command(ConnectC),
     {sent_time, _ConnectSentTime} =
         enet_host:send_outgoing_commands(Host, [HBin, CBin], IP, Port),
-    {next_state, connecting, S, ?PEER_TIMEOUT_MINIMUM};
+    NewS = S#state{ outgoing_reliable_sequence_number = SequenceNumber + 1 },
+    {next_state, connecting, NewS, ?PEER_TIMEOUT_MINIMUM};
 
 connecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %%
@@ -270,7 +274,8 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
        port = Port,
        peer_id = PeerID,
        incoming_session_id = IncomingSessionID,
-       outgoing_session_id = OutgoingSessionID
+       outgoing_session_id = OutgoingSessionID,
+       outgoing_reliable_sequence_number = SequenceNumber
       } = S,
     true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
     true = gproc:mreg(p, l, [
@@ -286,7 +291,8 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
                                              OutgoingSessionID,
                                              HostChannelLimit,
                                              HostIncomingBandwidth,
-                                             HostOutgoingBandwidth),
+                                             HostOutgoingBandwidth,
+                                             SequenceNumber),
     HBin = enet_protocol_encode:command_header(VCH),
     CBin = enet_protocol_encode:command(VCC),
     {sent_time, _VerifyConnectSentTime} =
@@ -303,7 +309,8 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
              window_size = WindowSize,
              packet_throttle_interval = PacketThrottleInterval,
              packet_throttle_acceleration = PacketThrottleAcceleration,
-             packet_throttle_deceleration = PacketThrottleDeceleration
+             packet_throttle_deceleration = PacketThrottleDeceleration,
+             outgoing_reliable_sequence_number = SequenceNumber + 1
             },
     {next_state, verifying_connect, NewS, ?PEER_TIMEOUT_MINIMUM}.
 
