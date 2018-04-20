@@ -5,11 +5,12 @@
 %%
 
 -record(protocol_header,
-        { compressed = 0
-        , session_id = 0
-        , peer_id    = ?MAX_PEER_ID
-        , sent_time  = undefined
-        , checksum   = undefined
+        {
+          compressed = 0,
+          session_id = 0,
+          peer_id    = ?MAX_PEER_ID,
+          sent_time  = undefined,
+          checksum   = undefined
         }).
 
 
@@ -18,11 +19,12 @@
 %%
 
 -record(command_header,
-        { please_acknowledge       = 0
-        , unsequenced              = 0
-        , command                  = 0
-        , channel_id               = 0
-        , reliable_sequence_number = 0
+        {
+          please_acknowledge       = 0,
+          unsequenced              = 0,
+          command                  = 0,
+          channel_id               = 0,
+          reliable_sequence_number = 0
         }).
 
 
@@ -31,8 +33,9 @@
 %%
 
 -record(acknowledge,
-        { received_reliable_sequence_number = 0
-        , received_sent_time                = 0
+        {
+          received_reliable_sequence_number = 0,
+          received_sent_time                = 0
         }).
 
 
@@ -41,19 +44,20 @@
 %%
 
 -record(connect,
-        { outgoing_peer_id             = 0
-        , incoming_session_id          = 0
-        , outgoing_session_id          = 0
-        , mtu                          = ?MIN_MTU
-        , window_size                  = ?MIN_WINDOW_SIZE
-        , channel_count                = ?MIN_CHANNEL_COUNT
-        , incoming_bandwidth           = 0
-        , outgoing_bandwidth           = 0
-        , packet_throttle_interval     = 0
-        , packet_throttle_acceleration = 0
-        , packet_throttle_deceleration = 0
-        , connect_id                   = 0
-        , data                         = 0
+        {
+          outgoing_peer_id             = 0,
+          incoming_session_id          = 0,
+          outgoing_session_id          = 0,
+          mtu                          = ?MIN_MTU,
+          window_size                  = ?MIN_WINDOW_SIZE,
+          channel_count                = ?MIN_CHANNEL_COUNT,
+          incoming_bandwidth           = 0,
+          outgoing_bandwidth           = 0,
+          packet_throttle_interval     = 0,
+          packet_throttle_acceleration = 0,
+          packet_throttle_deceleration = 0,
+          connect_id                   = 0,
+          data                         = 0
         }).
 
 
@@ -62,18 +66,19 @@
 %%
 
 -record(verify_connect,
-        { outgoing_peer_id             = 0
-        , incoming_session_id          = 0
-        , outgoing_session_id          = 0
-        , mtu                          = ?MIN_MTU
-        , window_size                  = ?MIN_WINDOW_SIZE
-        , channel_count                = ?MIN_CHANNEL_COUNT
-        , incoming_bandwidth           = 0
-        , outgoing_bandwidth           = 0
-        , packet_throttle_interval     = 0
-        , packet_throttle_acceleration = 0
-        , packet_throttle_deceleration = 0
-        , connect_id                   = 0
+        {
+          outgoing_peer_id             = 0,
+          incoming_session_id          = 0,
+          outgoing_session_id          = 0,
+          mtu                          = ?MIN_MTU,
+          window_size                  = ?MIN_WINDOW_SIZE,
+          channel_count                = ?MIN_CHANNEL_COUNT,
+          incoming_bandwidth           = 0,
+          outgoing_bandwidth           = 0,
+          packet_throttle_interval     = 0,
+          packet_throttle_acceleration = 0,
+          packet_throttle_deceleration = 0,
+          connect_id                   = 0
         }).
 
 
@@ -82,7 +87,8 @@
 %%
 
 -record(disconnect,
-        { data = 0
+        {
+          data = 0
         }).
 
 
@@ -91,7 +97,8 @@
 %%
 
 -record(ping,
-        {}).
+        {
+        }).
 
 
 %%
@@ -146,8 +153,9 @@
 %%
 
 -record(bandwidth_limit,
-        { incoming_bandwidth = 0
-        , outgoing_bandwidth = 0
+        {
+          incoming_bandwidth = 0,
+          outgoing_bandwidth = 0
         }).
 
 
@@ -156,7 +164,8 @@
 %%
 
 -record(throttle_configure,
-        { packet_throttle_interval     = 0
-        , packet_throttle_acceleration = 0
-        , packet_throttle_deceleration = 0
+        {
+          packet_throttle_interval     = 0,
+          packet_throttle_acceleration = 0,
+          packet_throttle_deceleration = 0
         }).
