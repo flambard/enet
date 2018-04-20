@@ -55,7 +55,7 @@
           packet_throttle_deceleration = ?PEER_PACKET_THROTTLE_DECELERATION,
           outgoing_reliable_sequence_number = 1,
           incoming_unsequenced_group = 0,
-          outgoing_unsequenced_group = 0,
+          outgoing_unsequenced_group = 1,
           unsequenced_window = 0,
           connect_id
         }).
@@ -201,6 +201,9 @@ connecting(send_connect, S) ->
        peer_id = PeerID,
        incoming_session_id = IncomingSessionID,
        outgoing_session_id = OutgoingSessionID,
+       packet_throttle_interval = PacketThrottleInterval,
+       packet_throttle_acceleration = PacketThrottleAcceleration,
+       packet_throttle_deceleration = PacketThrottleDeceleration,
        outgoing_reliable_sequence_number = SequenceNumber,
        connect_id = ConnectID
       } = S,
@@ -217,9 +220,9 @@ connecting(send_connect, S) ->
           MTU,
           IncomingBandwidth,
           OutgoingBandwidth,
-          S#state.packet_throttle_interval,
-          S#state.packet_throttle_acceleration,
-          S#state.packet_throttle_deceleration,
+          PacketThrottleInterval,
+          PacketThrottleAcceleration,
+          PacketThrottleDeceleration,
           ConnectID,
           SequenceNumber),
     HBin = enet_protocol_encode:command_header(ConnectH),
@@ -516,16 +519,16 @@ connected({outgoing_command, {H, C = #unsequenced{}}}, S) ->
        host = Host,
        ip = IP,
        port = Port,
-       remote_peer_id = RemotePeerID
+       remote_peer_id = RemotePeerID,
+       outgoing_unsequenced_group = Group
       } = S,
-    Group = S#state.outgoing_unsequenced_group + 1,
     C1 = C#unsequenced{ unsequenced_group = Group },
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C1),
     {sent_time, _SentTime} =
         enet_host:send_outgoing_commands(
           Host, [HBin, CBin], IP, Port, RemotePeerID),
-    NewS = S#state{ outgoing_unsequenced_group = Group },
+    NewS = S#state{ outgoing_unsequenced_group = Group + 1 },
     {next_state, connected, NewS};
 
 connected({outgoing_command, {H, C = #unreliable{}}}, S) ->
@@ -617,7 +620,7 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
     %% - Split and decode the commands from the binary
     %% - Send the commands as individual events to ourselves
     %%
-    #state{ ip = IP, port = Port } = S,
+    #state{ host = Host, ip = IP, port = Port } = S,
     {ok, Commands} = enet_protocol_decode:commands(Packet),
     lists:foreach(
       fun ({H = #command_header{ please_acknowledge = 0 }, C}) ->
@@ -634,7 +637,6 @@ handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
               %% - Acknowledge the command
               %% - Send the command to self for handling
               %%
-              Host = S#state.host,
               {AckH, AckC} = enet_command:acknowledge(H, SentTime),
               HBin = enet_protocol_encode:command_header(AckH),
               CBin = enet_protocol_encode:command(AckC),
