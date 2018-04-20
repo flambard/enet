@@ -15,14 +15,13 @@
         ]).
 
 
-acknowledge(H = #command_header{}, SentTime) ->
-    ReliableSequenceNumber = H#command_header.reliable_sequence_number,
+acknowledge(#command_header{ reliable_sequence_number = N }, SentTime) ->
     {
       #command_header{
         command = ?COMMAND_ACKNOWLEDGE
        },
       #acknowledge{
-         received_reliable_sequence_number = ReliableSequenceNumber,
+         received_reliable_sequence_number = N,
          received_sent_time = SentTime
         }
     }.
