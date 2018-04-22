@@ -181,7 +181,7 @@ init({remote_connect, Host, ChannelSup, _N, PeerID, IP, Port, Owner}) ->
            port = Port,
            peer_id = PeerID
           },
-    {ok, acknowledging_connect, S, ?PEER_TIMEOUT_MINIMUM}.
+    {ok, acknowledging_connect, S}.
 
 
 callback_mode() ->
