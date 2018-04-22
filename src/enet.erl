@@ -45,7 +45,8 @@ connect_peer(Host, IP, Port, ChannelCount) ->
 
 -spec sync_connect_peer(Host :: pid(), IP :: string(), Port :: port_number(),
                         ChannelCount :: pos_integer()) ->
-                               {ok, pid()} | {error, atom()}.
+                               {ok, {Peer :: pid(), Channels :: map()}} |
+                               {error, atom()}.
 
 sync_connect_peer(Host, IP, Port, ChannelCount) ->
     enet_host:sync_connect(Host, IP, Port, ChannelCount).
