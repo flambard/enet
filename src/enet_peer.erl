@@ -239,7 +239,7 @@ connecting(cast, send_connect, S) ->
              outgoing_reliable_sequence_number = SequenceNumber + 1,
              resend_timers = RTs
             },
-    {next_state, connecting, NewS, ?PEER_TIMEOUT_MINIMUM};
+    {keep_state, NewS, ?PEER_TIMEOUT_MINIMUM};
 
 connecting(cast, {incoming_command, {H, C = #acknowledge{}}}, S) ->
     %%
@@ -450,7 +450,7 @@ connected(cast, {incoming_command, {_H, #ping{}}}, S) ->
     %%
     %% - Do nothing
     %%
-    {next_state, connected, S};
+    {keep_state, S};
 
 connected(cast, {incoming_command, {_H, #acknowledge{}}}, S) ->
     %%
@@ -458,7 +458,7 @@ connected(cast, {incoming_command, {_H, #acknowledge{}}}, S) ->
     %%
     %% - Verify that the acknowledge is correct (TODO)
     %%
-    {next_state, connected, S};
+    {keep_state, S};
 
 connected(cast, {incoming_command, {_H, C = #bandwidth_limit{}}}, S) ->
     %%
@@ -484,7 +484,7 @@ connected(cast, {incoming_command, {_H, C = #bandwidth_limit{}}}, S) ->
              outgoing_bandwidth = OutgoingBandwidth,
              window_size = max(?MIN_WINDOW_SIZE, min(?MAX_WINDOW_SIZE, WSize))
             },
-    {next_state, connected, NewS};
+    {keep_state, NewS};
 
 connected(cast, {incoming_command, {_H, C = #throttle_configure{}}}, S) ->
     %%
@@ -502,7 +502,7 @@ connected(cast, {incoming_command, {_H, C = #throttle_configure{}}}, S) ->
              packet_throttle_acceleration = Acceleration,
              packet_throttle_deceleration = Deceleration
             },
-    {next_state, connected, NewS};
+    {keep_state, NewS};
 
 connected(cast, {incoming_command, {H, C = #unsequenced{}}}, S) ->
     %%
@@ -513,7 +513,7 @@ connected(cast, {incoming_command, {H, C = #unsequenced{}}}, S) ->
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
     ok = enet_channel:recv_unsequenced(Channel, {H, C}),
-    {next_state, connected, S};
+    {keep_state, S};
 
 connected(cast, {incoming_command, {H, C = #unreliable{}}}, S) ->
     %%
@@ -524,7 +524,7 @@ connected(cast, {incoming_command, {H, C = #unreliable{}}}, S) ->
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
     ok = enet_channel:recv_unreliable(Channel, {H, C}),
-    {next_state, connected, S};
+    {keep_state, S};
 
 connected(cast, {incoming_command, {H, C = #reliable{}}}, S) ->
     %%
@@ -535,7 +535,7 @@ connected(cast, {incoming_command, {H, C = #reliable{}}}, S) ->
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
     ok = enet_channel:recv_reliable(Channel, {H, C}),
-    {next_state, connected, S};
+    {keep_state, S};
 
 connected(cast, {incoming_command, {_H, #disconnect{}}}, S) ->
     %%
@@ -570,7 +570,7 @@ connected(cast, {outgoing_command, {H, C = #unsequenced{}}}, S) ->
         enet_host:send_outgoing_commands(
           Host, [HBin, CBin], IP, Port, RemotePeerID),
     NewS = S#state{ outgoing_unsequenced_group = Group + 1 },
-    {next_state, connected, NewS};
+    {keep_state, NewS};
 
 connected(cast, {outgoing_command, {H, C = #unreliable{}}}, S) ->
     %%
@@ -589,7 +589,7 @@ connected(cast, {outgoing_command, {H, C = #unreliable{}}}, S) ->
     {sent_time, _SentTime} =
         enet_host:send_outgoing_commands(
           Host, [HBin, CBin], IP, Port, RemotePeerID),
-    {next_state, connected, S};
+    {keep_state, S};
 
 connected(cast, {outgoing_command, {H, C = #reliable{}}}, S) ->
     %%
@@ -608,7 +608,7 @@ connected(cast, {outgoing_command, {H, C = #reliable{}}}, S) ->
     {sent_time, _SentTime} =
         enet_host:send_outgoing_commands(
           Host, [HBin, CBin], IP, Port, RemotePeerID),
-    {next_state, connected, S};
+    {keep_state, S};
 
 connected(cast, disconnect, State) ->
     %%
