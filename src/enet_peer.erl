@@ -449,15 +449,17 @@ connected(cast, {incoming_command, {_H, #ping{}}}, S) ->
     %%
     %% Received PING.
     %%
-    %% - Do nothing
+    %% - Reset the receive-timer
     %%
-    {keep_state, S};
+    RecvTimeout = reset_recv_timer(),
+    {keep_state, S, [RecvTimeout]};
 
 connected(cast, {incoming_command, {H, C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command.
     %%
     %% - Verify that the acknowledge is correct
+    %% - Reset the receive-timer
     %%
     #command_header{ channel_id = ChannelID } = H,
     #acknowledge{
@@ -465,13 +467,15 @@ connected(cast, {incoming_command, {H, C = #acknowledge{}}}, S) ->
        received_sent_time                = SentTime
       } = C,
     CanceledTimeout = cancel_resend_timer(ChannelID, SentTime, SequenceNumber),
-    {keep_state, S, [CanceledTimeout]};
+    RecvTimeout = reset_recv_timer(),
+    {keep_state, S, [CanceledTimeout, RecvTimeout]};
 
 connected(cast, {incoming_command, {_H, C = #bandwidth_limit{}}}, S) ->
     %%
     %% Received Bandwidth Limit command.
     %%
     %% - Set bandwidth limit
+    %% - Reset the receive-timer
     %%
     #bandwidth_limit{
        incoming_bandwidth = IncomingBandwidth,
@@ -491,13 +495,15 @@ connected(cast, {incoming_command, {_H, C = #bandwidth_limit{}}}, S) ->
              outgoing_bandwidth = OutgoingBandwidth,
              window_size = max(?MIN_WINDOW_SIZE, min(?MAX_WINDOW_SIZE, WSize))
             },
-    {keep_state, NewS};
+    RecvTimeout = reset_recv_timer(),
+    {keep_state, NewS, [RecvTimeout]};
 
 connected(cast, {incoming_command, {_H, C = #throttle_configure{}}}, S) ->
     %%
     %% Received Throttle Configure command.
     %%
     %% - Set throttle configuration
+    %% - Reset the receive-timer
     %%
     #throttle_configure{
        packet_throttle_interval = Interval,
@@ -509,40 +515,47 @@ connected(cast, {incoming_command, {_H, C = #throttle_configure{}}}, S) ->
              packet_throttle_acceleration = Acceleration,
              packet_throttle_deceleration = Deceleration
             },
-    {keep_state, NewS};
+    RecvTimeout = reset_recv_timer(),
+    {keep_state, NewS, [RecvTimeout]};
 
 connected(cast, {incoming_command, {H, C = #unsequenced{}}}, S) ->
     %%
     %% Received Send Unsequenced command.
     %%
     %% TODO: Describe.
+    %% - Reset the receive-timer
     %%
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
     ok = enet_channel:recv_unsequenced(Channel, {H, C}),
-    {keep_state, S};
+    RecvTimeout = reset_recv_timer(),
+    {keep_state, S, [RecvTimeout]};
 
 connected(cast, {incoming_command, {H, C = #unreliable{}}}, S) ->
     %%
     %% Received Send Unreliable command.
     %%
     %% TODO: Describe.
+    %% - Reset the receive-timer
     %%
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
     ok = enet_channel:recv_unreliable(Channel, {H, C}),
-    {keep_state, S};
+    RecvTimeout = reset_recv_timer(),
+    {keep_state, S, [RecvTimeout]};
 
 connected(cast, {incoming_command, {H, C = #reliable{}}}, S) ->
     %%
     %% Received Send Reliable command.
     %%
     %% TODO: Describe.
+    %% - Reset the receive-timer
     %%
     #command_header{ channel_id = ChannelID } = H,
     #state{ channels = #{ ChannelID := Channel } } = S,
     ok = enet_channel:recv_reliable(Channel, {H, C}),
-    {keep_state, S};
+    RecvTimeout = reset_recv_timer(),
+    {keep_state, S, [RecvTimeout]};
 
 connected(cast, {incoming_command, {_H, #disconnect{}}}, S) ->
     %%
@@ -562,6 +575,7 @@ connected(cast, {outgoing_command, {H, C = #unsequenced{}}}, S) ->
     %% - Increment outgoing_unsequenced_group
     %% - Set unsequenced_group on command to outgoing_unsequenced_group
     %% - Queue the command for sending
+    %% - Reset the send-timer
     %%
     #state{
        host = Host,
@@ -577,13 +591,15 @@ connected(cast, {outgoing_command, {H, C = #unsequenced{}}}, S) ->
     {sent_time, _SentTime} =
         enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
     NewS = S#state{ outgoing_unsequenced_group = Group + 1 },
-    {keep_state, NewS};
+    SendTimeout = reset_send_timer(),
+    {keep_state, NewS, [SendTimeout]};
 
 connected(cast, {outgoing_command, {H, C = #unreliable{}}}, S) ->
     %%
     %% Sending a Sequenced, unreliable command.
     %%
     %% TODO: Describe.
+    %% - Reset the send-timer
     %%
     #state{
        host = Host,
@@ -596,13 +612,15 @@ connected(cast, {outgoing_command, {H, C = #unreliable{}}}, S) ->
     Data = [HBin, CBin],
     {sent_time, _SentTime} =
         enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
-    {keep_state, S};
+    SendTimeout = reset_send_timer(),
+    {keep_state, S, [SendTimeout]};
 
 connected(cast, {outgoing_command, {H, C = #reliable{}}}, S) ->
     %%
     %% Sending a Sequenced, reliable command.
     %%
     %% TODO: Describe.
+    %% - Reset the send-timer
     %%
     #state{
        host = Host,
@@ -622,7 +640,8 @@ connected(cast, {outgoing_command, {H, C = #reliable{}}}, S) ->
     SendReliableTimeout =
         make_resend_timer(
           ChannelID, SentTime, SequenceNr, ?PEER_TIMEOUT_MINIMUM, Data),
-    {keep_state, S, [SendReliableTimeout]};
+    SendTimeout = reset_send_timer(),
+    {keep_state, S, [SendReliableTimeout, SendTimeout]};
 
 connected(cast, disconnect, State) ->
     %%
@@ -650,7 +669,8 @@ connected({timeout, {ChannelID, SentTime, SequenceNr}}, Data, S) ->
     %%
     %% - TODO: Keep track of number of resends
     %% - Resend the associated command
-    %% - Reset the timer
+    %% - Reset the resend-timer
+    %% - Reset the send-timer
     %%
     #state{
        host = Host,
@@ -662,7 +682,38 @@ connected({timeout, {ChannelID, SentTime, SequenceNr}}, Data, S) ->
     NewTimeout =
         make_resend_timer(
           ChannelID, SentTime, SequenceNr, ?PEER_TIMEOUT_MINIMUM, Data),
-    {keep_state, S, [NewTimeout]};
+    SendTimeout = reset_send_timer(),
+    {keep_state, S, [NewTimeout, SendTimeout]};
+
+connected({timeout, recv}, ping, S) ->
+    %%
+    %% The receive-timer was triggered.
+    %%
+    %% - Stop
+    %%
+    {stop, timeout, S};
+
+connected({timeout, send}, ping, S) ->
+    %%
+    %% The send-timer was triggered.
+    %%
+    %% - Send a PING
+    %% - Reset the send-timer
+    %%
+    #state{
+       host = Host,
+       ip = IP,
+       port = Port,
+       remote_peer_id = RemotePeerID
+      } = S,
+    {H, C} = enet_command:ping(),
+    HBin = enet_protocol_encode:command_header(H),
+    CBin = enet_protocol_encode:command(C),
+    Data = [HBin, CBin],
+    {sent_time, _SentTime} =
+        enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
+    SendTimeout = reset_send_timer(),
+    {keep_state, S, [SendTimeout]};
 
 connected(EventType, EventContent, S) ->
     handle_event(EventType, EventContent, S).
@@ -687,8 +738,8 @@ disconnecting(cast, {incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     Owner ! {enet, disconnected, local, self(), ConnectID},
     {stop, normal, S};
 
-%% disconnecting(cast, _Command, S) ->
-%%     {keep_state, S};
+disconnecting(cast, {incoming_command, {_H, _C}}, S) ->
+    {keep_state, S};
 
 disconnecting(EventType, EventContent, S) ->
     handle_event(EventType, EventContent, S).
@@ -779,3 +830,9 @@ make_resend_timer(ChannelID, SentTime, SequenceNumber, Time, Data) ->
 
 cancel_resend_timer(ChannelID, SentTime, SequenceNumber) ->
     {{timeout, {ChannelID, SentTime, SequenceNumber}}, infinity, undefined}.
+
+reset_recv_timer() ->
+    {{timeout, recv}, 2 * ?PEER_PING_INTERVAL, ping}.
+
+reset_send_timer() ->
+    {{timeout, send}, ?PEER_PING_INTERVAL, ping}.
