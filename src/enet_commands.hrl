@@ -23,7 +23,7 @@
           please_acknowledge       = 0,
           unsequenced              = 0,
           command                  = 0,
-          channel_id               = 0,
+          channel_id               = 16#FF,
           reliable_sequence_number = 0
         }).
 
