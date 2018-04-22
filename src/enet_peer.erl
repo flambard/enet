@@ -1,5 +1,5 @@
 -module(enet_peer).
--behaviour(gen_fsm).
+-behaviour(gen_statem).
 
 -include("enet_commands.hrl").
 -include("enet_protocol.hrl").
@@ -15,24 +15,22 @@
          get_mtu/1
         ]).
 
-%% gen_fsm callbacks
+%% gen_statem callbacks
 -export([
          init/1,
-         handle_event/3,
-         handle_sync_event/4,
-         handle_info/3,
+         callback_mode/0,
          terminate/3,
          code_change/4
         ]).
 
-%% gen_fsm state functions
+%% gen_statem state functions
 -export([
-         connecting/2,
-         acknowledging_connect/2,
-         acknowledging_verify_connect/2,
-         verifying_connect/2,
-         connected/2,
-         disconnecting/2
+         connecting/3,
+         acknowledging_connect/3,
+         acknowledging_verify_connect/3,
+         verifying_connect/3,
+         connected/3,
+         disconnecting/3
         ]).
 
 -record(state,
@@ -113,38 +111,38 @@
 %%%===================================================================
 
 start_link(local, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
-    gen_fsm:start_link(
+    gen_statem:start_link(
       ?MODULE,
       {local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner},
       []);
 
 start_link(remote, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
-    gen_fsm:start_link(
+    gen_statem:start_link(
       ?MODULE,
       {remote_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner},
       []).
 
 disconnect(Peer) ->
-    gen_fsm:send_event(Peer, disconnect).
+    gen_statem:cast(Peer, disconnect).
 
 channels(Peer) ->
-    gen_fsm:sync_send_all_state_event(Peer, channels).
+    gen_statem:call(Peer, channels).
 
 get_connect_id(Peer) ->
-    gen_fsm:sync_send_all_state_event(Peer, connect_id).
+    gen_statem:call(Peer, connect_id).
 
 recv_incoming_packet(Peer, SentTime, Packet) ->
-    gen_fsm:send_all_state_event(Peer, {incoming_packet, SentTime, Packet}).
+    gen_statem:cast(Peer, {incoming_packet, SentTime, Packet}).
 
 send_command(Peer, {H, C}) ->
-    gen_fsm:send_event(Peer, {outgoing_command, {H, C}}).
+    gen_statem:cast(Peer, {outgoing_command, {H, C}}).
 
 get_mtu(Peer) ->
     gproc:get_value({p, l, mtu}, Peer).
 
 
 %%%===================================================================
-%%% gen_fsm callbacks
+%%% gen_statem callbacks
 %%%===================================================================
 
 init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
@@ -154,7 +152,7 @@ init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
     %% - Send a Connect command to the remote peer (use peer ID)
     %% - Start in the 'connecting' state
     %%
-    ok = gen_fsm:send_event(self(), send_connect),
+    ok = gen_statem:cast(self(), send_connect),
     Channels = start_channels(ChannelSup, N, Owner),
     <<ConnectID:32>> = crypto:strong_rand_bytes(4),
     gproc:reg({p, l, remote_host_port}, Port),
@@ -186,11 +184,15 @@ init({remote_connect, Host, ChannelSup, _N, PeerID, IP, Port, Owner}) ->
     {ok, acknowledging_connect, S, ?PEER_TIMEOUT_MINIMUM}.
 
 
+callback_mode() ->
+    state_functions.
+
+
 %%%
 %%% Connecting state
 %%%
 
-connecting(send_connect, S) ->
+connecting(cast, send_connect, S) ->
     %%
     %% Sending the initial Connect command.
     %%
@@ -239,7 +241,7 @@ connecting(send_connect, S) ->
             },
     {next_state, connecting, NewS, ?PEER_TIMEOUT_MINIMUM};
 
-connecting({incoming_command, {H, C = #acknowledge{}}}, S) ->
+connecting(cast, {incoming_command, {H, C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command in the 'connecting' state.
     %%
@@ -264,15 +266,18 @@ connecting({incoming_command, {H, C = #acknowledge{}}}, S) ->
             }
     end;
 
-connecting(timeout, S) ->
-    {stop, timeout, S}.
+connecting(timeout, _, S) ->
+    {stop, timeout, S};
+
+connecting(EventType, EventContent, S) ->
+    handle_event(EventType, EventContent, S).
 
 
 %%%
 %%% Acknowledging Connect state
 %%%
 
-acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
+acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
     %%
     %% Received a Connect command.
     %%
@@ -341,14 +346,18 @@ acknowledging_connect({incoming_command, {_H, C = #connect{}}}, S) ->
              packet_throttle_deceleration = PacketThrottleDeceleration,
              outgoing_reliable_sequence_number = SequenceNumber + 1
             },
-    {next_state, verifying_connect, NewS, ?PEER_TIMEOUT_MINIMUM}.
+    {next_state, verifying_connect, NewS, ?PEER_TIMEOUT_MINIMUM};
+
+acknowledging_connect(EventType, EventContent, S) ->
+    handle_event(EventType, EventContent, S).
 
 
 %%%
 %%% Acknowledging Verify Connect state
 %%%
 
-acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S) ->
+acknowledging_verify_connect(
+  cast, {incoming_command, {_H, C = #verify_connect{}}}, S) ->
     %%
     %% Received a Verify Connect command in the 'acknowledging_verify_connect'
     %% state.
@@ -401,14 +410,17 @@ acknowledging_verify_connect({incoming_command, {_H, C = #verify_connect{}}}, S)
             {next_state, connected, NewS};
         _Mismatch ->
             {stop, connect_verification_failed, S}
-    end.
+    end;
+
+acknowledging_verify_connect(EventType, EventContent, S) ->
+    handle_event(EventType, EventContent, S).
 
 
 %%%
 %%% Verifying Connect state
 %%%
 
-verifying_connect({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
+verifying_connect(cast, {incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command in the 'verifying_connect' state.
     %%
@@ -422,14 +434,17 @@ verifying_connect({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
        connect_id = ConnectID
       } = S,
     Owner ! {enet, connect, remote, {self(), Channels}, ConnectID},
-    {next_state, connected, S}.
+    {next_state, connected, S};
+
+verifying_connect(EventType, EventContent, S) ->
+    handle_event(EventType, EventContent, S).
 
 
 %%%
 %%% Connected state
 %%%
 
-connected({incoming_command, {_H, #ping{}}}, S) ->
+connected(cast, {incoming_command, {_H, #ping{}}}, S) ->
     %%
     %% Received PING.
     %%
@@ -437,7 +452,7 @@ connected({incoming_command, {_H, #ping{}}}, S) ->
     %%
     {next_state, connected, S};
 
-connected({incoming_command, {_H, #acknowledge{}}}, S) ->
+connected(cast, {incoming_command, {_H, #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command.
     %%
@@ -445,7 +460,7 @@ connected({incoming_command, {_H, #acknowledge{}}}, S) ->
     %%
     {next_state, connected, S};
 
-connected({incoming_command, {_H, C = #bandwidth_limit{}}}, S) ->
+connected(cast, {incoming_command, {_H, C = #bandwidth_limit{}}}, S) ->
     %%
     %% Received Bandwidth Limit command.
     %%
@@ -471,7 +486,7 @@ connected({incoming_command, {_H, C = #bandwidth_limit{}}}, S) ->
             },
     {next_state, connected, NewS};
 
-connected({incoming_command, {_H, C = #throttle_configure{}}}, S) ->
+connected(cast, {incoming_command, {_H, C = #throttle_configure{}}}, S) ->
     %%
     %% Received Throttle Configure command.
     %%
@@ -489,7 +504,7 @@ connected({incoming_command, {_H, C = #throttle_configure{}}}, S) ->
             },
     {next_state, connected, NewS};
 
-connected({incoming_command, {H, C = #unsequenced{}}}, S) ->
+connected(cast, {incoming_command, {H, C = #unsequenced{}}}, S) ->
     %%
     %% Received Send Unsequenced command.
     %%
@@ -500,7 +515,7 @@ connected({incoming_command, {H, C = #unsequenced{}}}, S) ->
     ok = enet_channel:recv_unsequenced(Channel, {H, C}),
     {next_state, connected, S};
 
-connected({incoming_command, {H, C = #unreliable{}}}, S) ->
+connected(cast, {incoming_command, {H, C = #unreliable{}}}, S) ->
     %%
     %% Received Send Unreliable command.
     %%
@@ -511,7 +526,7 @@ connected({incoming_command, {H, C = #unreliable{}}}, S) ->
     ok = enet_channel:recv_unreliable(Channel, {H, C}),
     {next_state, connected, S};
 
-connected({incoming_command, {H, C = #reliable{}}}, S) ->
+connected(cast, {incoming_command, {H, C = #reliable{}}}, S) ->
     %%
     %% Received Send Reliable command.
     %%
@@ -522,7 +537,7 @@ connected({incoming_command, {H, C = #reliable{}}}, S) ->
     ok = enet_channel:recv_reliable(Channel, {H, C}),
     {next_state, connected, S};
 
-connected({incoming_command, {_H, #disconnect{}}}, S) ->
+connected(cast, {incoming_command, {_H, #disconnect{}}}, S) ->
     %%
     %% Received Disconnect command.
     %%
@@ -532,7 +547,7 @@ connected({incoming_command, {_H, #disconnect{}}}, S) ->
     S#state.owner ! {enet, disconnected, remote, self(), S#state.connect_id},
     {stop, normal, S};
 
-connected({outgoing_command, {H, C = #unsequenced{}}}, S) ->
+connected(cast, {outgoing_command, {H, C = #unsequenced{}}}, S) ->
     %%
     %% Sending an Unsequenced, unreliable command.
     %%
@@ -557,7 +572,7 @@ connected({outgoing_command, {H, C = #unsequenced{}}}, S) ->
     NewS = S#state{ outgoing_unsequenced_group = Group + 1 },
     {next_state, connected, NewS};
 
-connected({outgoing_command, {H, C = #unreliable{}}}, S) ->
+connected(cast, {outgoing_command, {H, C = #unreliable{}}}, S) ->
     %%
     %% Sending a Sequenced, unreliable command.
     %%
@@ -576,7 +591,7 @@ connected({outgoing_command, {H, C = #unreliable{}}}, S) ->
           Host, [HBin, CBin], IP, Port, RemotePeerID),
     {next_state, connected, S};
 
-connected({outgoing_command, {H, C = #reliable{}}}, S) ->
+connected(cast, {outgoing_command, {H, C = #reliable{}}}, S) ->
     %%
     %% Sending a Sequenced, reliable command.
     %%
@@ -595,7 +610,7 @@ connected({outgoing_command, {H, C = #reliable{}}}, S) ->
           Host, [HBin, CBin], IP, Port, RemotePeerID),
     {next_state, connected, S};
 
-connected(disconnect, State) ->
+connected(cast, disconnect, State) ->
     %%
     %% Disconnecting.
     %%
@@ -613,14 +628,17 @@ connected(disconnect, State) ->
     CBin = enet_protocol_encode:command(C),
     enet_host:send_outgoing_commands(
       Host, [HBin, CBin], IP, Port, RemotePeerID),
-    {next_state, disconnecting, State}.
+    {next_state, disconnecting, State};
+
+connected(EventType, EventContent, S) ->
+    handle_event(EventType, EventContent, S).
 
 
 %%%
 %%% Disconnecting state
 %%%
 
-disconnecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
+disconnecting(cast, {incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command in the 'disconnecting' state.
     %%
@@ -631,73 +649,11 @@ disconnecting({incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     S#state.owner ! {enet, disconnected, local, self(), S#state.connect_id},
     {stop, normal, S};
 
-disconnecting(_Command, S) ->
-    {next_state, disconnecting, S}.
+%% disconnecting(cast, _Command, S) ->
+%%     {keep_state, S};
 
-
-%%%
-%%% handle_event
-%%%
-
-handle_event({incoming_packet, SentTime, Packet}, StateName, S) ->
-    %%
-    %% Received an incoming packet of commands.
-    %%
-    %% - Split and decode the commands from the binary
-    %% - Send the commands as individual events to ourselves
-    %%
-    #state{ host = Host, ip = IP, port = Port } = S,
-    {ok, Commands} = enet_protocol_decode:commands(Packet),
-    lists:foreach(
-      fun ({H = #command_header{ please_acknowledge = 0 }, C}) ->
-              %%
-              %% Received command that does not need to be acknowledged.
-              %%
-              %% - Send the command to self for handling
-              %%
-              gen_fsm:send_event(self(), {incoming_command, {H, C}});
-          ({H = #command_header{ please_acknowledge = 1 }, C}) ->
-              %%
-              %% Received a command that should be acknowledged.
-              %%
-              %% - Acknowledge the command
-              %% - Send the command to self for handling
-              %%
-              {AckH, AckC} = enet_command:acknowledge(H, SentTime),
-              HBin = enet_protocol_encode:command_header(AckH),
-              CBin = enet_protocol_encode:command(AckC),
-              RemotePeerID =
-                  case C of
-                      #connect{}        -> C#connect.outgoing_peer_id;
-                      #verify_connect{} -> C#verify_connect.outgoing_peer_id;
-                      _                 -> S#state.remote_peer_id
-                  end,
-              {sent_time, _AckSentTime} =
-                  enet_host:send_outgoing_commands(
-                    Host, [HBin, CBin], IP, Port, RemotePeerID),
-              gen_fsm:send_event(self(), {incoming_command, {H, C}})
-      end,
-      Commands),
-    {next_state, StateName, S}.
-
-
-%%%
-%%% handle_sync_event
-%%%
-
-handle_sync_event(channels, _From, StateName, S) ->
-    {reply, S#state.channels, StateName, S};
-
-handle_sync_event(connect_id, _From, StateName, S) ->
-    {reply, S#state.connect_id, StateName, S}.
-
-
-%%%
-%%% handle_info
-%%%
-
-handle_info(_Info, _StateName, State) ->
-    {stop, unexpected_message, State}.
+disconnecting(EventType, EventContent, S) ->
+    handle_event(EventType, EventContent, S).
 
 
 %%%
@@ -719,6 +675,54 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+handle_event(cast, {incoming_packet, SentTime, Packet}, S) ->
+    %%
+    %% Received an incoming packet of commands.
+    %%
+    %% - Split and decode the commands from the binary
+    %% - Send the commands as individual events to ourselves
+    %%
+    #state{ host = Host, ip = IP, port = Port } = S,
+    {ok, Commands} = enet_protocol_decode:commands(Packet),
+    lists:foreach(
+      fun ({H = #command_header{ please_acknowledge = 0 }, C}) ->
+              %%
+              %% Received command that does not need to be acknowledged.
+              %%
+              %% - Send the command to self for handling
+              %%
+              gen_statem:cast(self(), {incoming_command, {H, C}});
+          ({H = #command_header{ please_acknowledge = 1 }, C}) ->
+              %%
+              %% Received a command that should be acknowledged.
+              %%
+              %% - Acknowledge the command
+              %% - Send the command to self for handling
+              %%
+              {AckH, AckC} = enet_command:acknowledge(H, SentTime),
+              HBin = enet_protocol_encode:command_header(AckH),
+              CBin = enet_protocol_encode:command(AckC),
+              RemotePeerID =
+                  case C of
+                      #connect{}        -> C#connect.outgoing_peer_id;
+                      #verify_connect{} -> C#verify_connect.outgoing_peer_id;
+                      _                 -> S#state.remote_peer_id
+                  end,
+              {sent_time, _AckSentTime} =
+                  enet_host:send_outgoing_commands(
+                    Host, [HBin, CBin], IP, Port, RemotePeerID),
+              gen_statem:cast(self(), {incoming_command, {H, C}})
+      end,
+      Commands),
+    {keep_state, S};
+
+handle_event({call, From}, channels, S) ->
+    {keep_state, S, [{reply, From, S#state.channels}]};
+
+handle_event({call, From}, connect_id, S) ->
+    {keep_state, S, [{reply, From, S#state.connect_id}]}.
+
 
 start_channels(ChannelSup, N, Owner) ->
     IDs = lists:seq(0, N-1),
