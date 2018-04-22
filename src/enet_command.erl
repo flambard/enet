@@ -9,6 +9,7 @@
          verify_connect/8,
          sequenced_disconnect/0,
          unsequenced_disconnect/0,
+         ping/0,
          send_unsequenced/2,
          send_unreliable/3,
          send_reliable/3
@@ -48,7 +49,6 @@ connect(OutgoingPeerID,
     {
       #command_header{
          command = ?COMMAND_CONNECT,
-         channel_id = 16#FF,
          please_acknowledge = 1,
          reliable_sequence_number = OutgoingReliableSequenceNumber
         },
@@ -87,7 +87,6 @@ verify_connect(C = #connect{},
     {
       #command_header{
          command = ?COMMAND_VERIFY_CONNECT,
-         channel_id = 16#FF,
          please_acknowledge = 1,
          reliable_sequence_number = OutgoingReliableSequenceNumber
         },
@@ -126,6 +125,17 @@ unsequenced_disconnect() ->
         },
       #disconnect{}
     }.
+
+
+ping() ->
+    {
+      #command_header{
+         unsequenced = 1,
+         command = ?COMMAND_PING
+        },
+      #ping{}
+    }.
+
 
 send_unsequenced(ChannelID, Data) ->
     {
