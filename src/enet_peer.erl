@@ -229,12 +229,13 @@ connecting(cast, send_connect, S) ->
           SequenceNr),
     HBin = enet_protocol_encode:command_header(ConnectH),
     CBin = enet_protocol_encode:command(ConnectC),
+    Data = [HBin, CBin],
     {sent_time, SentTime} =
-        enet_host:send_outgoing_commands(Host, [HBin, CBin], IP, Port),
+        enet_host:send_outgoing_commands(Host, Data, IP, Port),
     ChannelID = 16#FF,
     ConnectTimeout =
         make_resend_timer(
-          ChannelID, SentTime, SequenceNr, ?PEER_TIMEOUT_MINIMUM, [HBin, CBin]),
+          ChannelID, SentTime, SequenceNr, ?PEER_TIMEOUT_MINIMUM, Data),
     NewS = S#state{ outgoing_reliable_sequence_number = SequenceNr + 1 },
     {keep_state, NewS, [ConnectTimeout]};
 
@@ -296,7 +297,7 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
        peer_id = PeerID,
        incoming_session_id = IncomingSessionID,
        outgoing_session_id = OutgoingSessionID,
-       outgoing_reliable_sequence_number = SequenceNumber
+       outgoing_reliable_sequence_number = SequenceNr
       } = S,
     true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
     true = gproc:mreg(p, l, [
@@ -313,14 +314,18 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
                                              HostChannelLimit,
                                              HostIncomingBandwidth,
                                              HostOutgoingBandwidth,
-                                             SequenceNumber),
+                                             SequenceNr),
     HBin = enet_protocol_encode:command_header(VCH),
     CBin = enet_protocol_encode:command(VCC),
-    {sent_time, _VerifyConnectSentTime} =
-        enet_host:send_outgoing_commands(
-          Host, [HBin, CBin], IP, Port, RemotePeerID),
+    Data = [HBin, CBin],
+    {sent_time, SentTime} =
+        enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
     ok = enet_host:set_remote_peer_id(Host, RemotePeerID),
     Channels = start_channels(ChannelSup, ChannelCount, Owner),
+    ChannelID = 16#FF,
+    VerifyConnectTimeout =
+        make_resend_timer(
+          ChannelID, SentTime, SequenceNr, ?PEER_TIMEOUT_MINIMUM, Data),
     NewS = S#state{
              remote_peer_id = RemotePeerID,
              channels = Channels,
@@ -331,9 +336,12 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
              packet_throttle_interval = PacketThrottleInterval,
              packet_throttle_acceleration = PacketThrottleAcceleration,
              packet_throttle_deceleration = PacketThrottleDeceleration,
-             outgoing_reliable_sequence_number = SequenceNumber + 1
+             outgoing_reliable_sequence_number = SequenceNr + 1
             },
-    {next_state, verifying_connect, NewS, ?PEER_TIMEOUT_MINIMUM};
+    {next_state, verifying_connect, NewS, [VerifyConnectTimeout]};
+
+acknowledging_connect({timeout, {_ChannelID, _SentTime, _SequenceNr}}, _, S) ->
+    {stop, timeout, S};
 
 acknowledging_connect(EventType, EventContent, S) ->
     handle_event(EventType, EventContent, S).
@@ -407,11 +415,11 @@ acknowledging_verify_connect(EventType, EventContent, S) ->
 %%% Verifying Connect state
 %%%
 
-verifying_connect(cast, {incoming_command, {_H, _C = #acknowledge{}}}, S) ->
+verifying_connect(cast, {incoming_command, {H, C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command in the 'verifying_connect' state.
     %%
-    %% - Verify that the acknowledge is correct (TODO)
+    %% - Verify that the acknowledge is correct
     %% - Notify owner that a new peer has been connected
     %% - Change to 'connected' state
     %%
@@ -421,7 +429,13 @@ verifying_connect(cast, {incoming_command, {_H, _C = #acknowledge{}}}, S) ->
        connect_id = ConnectID
       } = S,
     Owner ! {enet, connect, remote, {self(), Channels}, ConnectID},
-    {next_state, connected, S};
+    #command_header{ channel_id = ChannelID } = H,
+    #acknowledge{
+       received_reliable_sequence_number = SequenceNumber,
+       received_sent_time                = SentTime
+      } = C,
+    CanceledTimeout = cancel_resend_timer(ChannelID, SentTime, SequenceNumber),
+    {next_state, connected, S, [CanceledTimeout]};
 
 verifying_connect(EventType, EventContent, S) ->
     handle_event(EventType, EventContent, S).
@@ -439,13 +453,19 @@ connected(cast, {incoming_command, {_H, #ping{}}}, S) ->
     %%
     {keep_state, S};
 
-connected(cast, {incoming_command, {_H, #acknowledge{}}}, S) ->
+connected(cast, {incoming_command, {H, C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command.
     %%
-    %% - Verify that the acknowledge is correct (TODO)
+    %% - Verify that the acknowledge is correct
     %%
-    {keep_state, S};
+    #command_header{ channel_id = ChannelID } = H,
+    #acknowledge{
+       received_reliable_sequence_number = SequenceNumber,
+       received_sent_time                = SentTime
+      } = C,
+    CanceledTimeout = cancel_resend_timer(ChannelID, SentTime, SequenceNumber),
+    {keep_state, S, [CanceledTimeout]};
 
 connected(cast, {incoming_command, {_H, C = #bandwidth_limit{}}}, S) ->
     %%
@@ -553,9 +573,9 @@ connected(cast, {outgoing_command, {H, C = #unsequenced{}}}, S) ->
     C1 = C#unsequenced{ unsequenced_group = Group },
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C1),
+    Data = [HBin, CBin],
     {sent_time, _SentTime} =
-        enet_host:send_outgoing_commands(
-          Host, [HBin, CBin], IP, Port, RemotePeerID),
+        enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
     NewS = S#state{ outgoing_unsequenced_group = Group + 1 },
     {keep_state, NewS};
 
@@ -573,9 +593,9 @@ connected(cast, {outgoing_command, {H, C = #unreliable{}}}, S) ->
       } = S,
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C),
+    Data = [HBin, CBin],
     {sent_time, _SentTime} =
-        enet_host:send_outgoing_commands(
-          Host, [HBin, CBin], IP, Port, RemotePeerID),
+        enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
     {keep_state, S};
 
 connected(cast, {outgoing_command, {H, C = #reliable{}}}, S) ->
@@ -590,12 +610,19 @@ connected(cast, {outgoing_command, {H, C = #reliable{}}}, S) ->
        port = Port,
        remote_peer_id = RemotePeerID
       } = S,
+    #command_header{
+       channel_id = ChannelID,
+       reliable_sequence_number = SequenceNr
+      } = H,
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C),
-    {sent_time, _SentTime} =
-        enet_host:send_outgoing_commands(
-          Host, [HBin, CBin], IP, Port, RemotePeerID),
-    {keep_state, S};
+    Data = [HBin, CBin],
+    {sent_time, SentTime} =
+        enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
+    SendReliableTimeout =
+        make_resend_timer(
+          ChannelID, SentTime, SequenceNr, ?PEER_TIMEOUT_MINIMUM, Data),
+    {keep_state, S, [SendReliableTimeout]};
 
 connected(cast, disconnect, State) ->
     %%
@@ -613,9 +640,29 @@ connected(cast, disconnect, State) ->
     {H, C} = enet_command:sequenced_disconnect(),
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C),
-    enet_host:send_outgoing_commands(
-      Host, [HBin, CBin], IP, Port, RemotePeerID),
+    Data = [HBin, CBin],
+    enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
     {next_state, disconnecting, State};
+
+connected({timeout, {ChannelID, SentTime, SequenceNr}}, Data, S) ->
+    %%
+    %% A resend-timer was triggered.
+    %%
+    %% - TODO: Keep track of number of resends
+    %% - Resend the associated command
+    %% - Reset the timer
+    %%
+    #state{
+       host = Host,
+       ip = IP,
+       port = Port,
+       remote_peer_id = RemotePeerID
+      } = S,
+    enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
+    NewTimeout =
+        make_resend_timer(
+          ChannelID, SentTime, SequenceNr, ?PEER_TIMEOUT_MINIMUM, Data),
+    {keep_state, S, [NewTimeout]};
 
 connected(EventType, EventContent, S) ->
     handle_event(EventType, EventContent, S).
@@ -629,11 +676,15 @@ disconnecting(cast, {incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command in the 'disconnecting' state.
     %%
-    %% - Verify that the acknowledge is correct (TODO)
+    %% - Verify that the acknowledge is correct
     %% - Notify owner application
     %% - Stop
     %%
-    S#state.owner ! {enet, disconnected, local, self(), S#state.connect_id},
+    #state{
+       owner = Owner,
+       connect_id = ConnectID
+      } = S,
+    Owner ! {enet, disconnected, local, self(), ConnectID},
     {stop, normal, S};
 
 %% disconnecting(cast, _Command, S) ->
