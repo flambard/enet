@@ -370,9 +370,9 @@ acknowledging_verify_connect(
        outgoing_peer_id             = RemotePeerID,
        incoming_session_id          = _IncomingSessionID,
        outgoing_session_id          = _OutgoingSessionID,
-       mtu                          = _MTU,
+       mtu                          = RemoteMTU,
        window_size                  = WindowSize,
-       channel_count                = ChannelCount,
+       channel_count                = RemoteChannelCount,
        incoming_bandwidth           = IncomingBandwidth,
        outgoing_bandwidth           = OutgoingBandwidth,
        packet_throttle_interval     = ThrottleInterval,
@@ -383,24 +383,30 @@ acknowledging_verify_connect(
     %%
     %% TODO: Calculate and validate Session IDs
     %%
-    case {maps:size(S#state.channels), S} of
-        {
-          ChannelCount,
-          #state{
-             ip                           = IP,
-             port                         = Port,
-             owner                        = Owner,
-             host                         = Host,
-             channels                     = Channels,
-             window_size                  = WindowSize,
-             incoming_bandwidth           = IncomingBandwidth,
-             outgoing_bandwidth           = OutgoingBandwidth,
-             packet_throttle_interval     = ThrottleInterval,
-             packet_throttle_acceleration = ThrottleAcceleration,
-             packet_throttle_deceleration = ThrottleDecelaration,
-             connect_id                   = ConnectID
-            }
-        } ->
+    #state{ channels = Channels } = S,
+    LocalChannelCount = maps:size(Channels),
+    LocalMTU = get_mtu(self()),
+    case S of
+        #state{
+           ip                           = IP,
+           port                         = Port,
+           owner                        = Owner,
+           host                         = Host,
+           %% ---
+           %% Fields below are matched against the values received in
+           %% the Verify Connect command.
+           %% ---
+           window_size                  = WindowSize,
+           incoming_bandwidth           = IncomingBandwidth,
+           outgoing_bandwidth           = OutgoingBandwidth,
+           packet_throttle_interval     = ThrottleInterval,
+           packet_throttle_acceleration = ThrottleAcceleration,
+           packet_throttle_deceleration = ThrottleDecelaration,
+           connect_id                   = ConnectID
+           %% ---
+          } when
+              LocalChannelCount =:= RemoteChannelCount,
+              LocalMTU =:= RemoteMTU ->
             true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
             true = gproc:reg({p, l, remote_peer_id}, RemotePeerID),
             ok = enet_host:set_remote_peer_id(Host, RemotePeerID),
