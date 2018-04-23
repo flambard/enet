@@ -9,9 +9,9 @@
          start_link/8,
          disconnect/1,
          channels/1,
-         get_connect_id/1,
          recv_incoming_packet/3,
          send_command/2,
+         get_connect_id/1,
          get_mtu/1
         ]).
 
@@ -127,14 +127,14 @@ disconnect(Peer) ->
 channels(Peer) ->
     gen_statem:call(Peer, channels).
 
-get_connect_id(Peer) ->
-    gen_statem:call(Peer, connect_id).
-
 recv_incoming_packet(Peer, SentTime, Packet) ->
     gen_statem:cast(Peer, {incoming_packet, SentTime, Packet}).
 
 send_command(Peer, {H, C}) ->
     gen_statem:cast(Peer, {outgoing_command, {H, C}}).
+
+get_connect_id(Peer) ->
+    gproc:get_value({p, l, connect_id}, Peer).
 
 get_mtu(Peer) ->
     gproc:get_value({p, l, mtu}, Peer).
@@ -154,7 +154,10 @@ init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
     ok = gen_statem:cast(self(), send_connect),
     Channels = start_channels(ChannelSup, N, Owner),
     <<ConnectID:32>> = crypto:strong_rand_bytes(4),
-    gproc:reg({p, l, remote_host_port}, Port),
+    true = gproc:mreg(p, l, [
+                             {connect_id, ConnectID},
+                             {remote_host_port, Port}
+                            ]),
     S = #state{
            owner = Owner,
            channel_sup = ChannelSup,
@@ -301,6 +304,7 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
       } = S,
     true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
     true = gproc:mreg(p, l, [
+                             {connect_id, ConnectID},
                              {mtu, MTU},
                              {remote_peer_id, RemotePeerID}
                             ]),
@@ -564,7 +568,11 @@ connected(cast, {incoming_command, {_H, #disconnect{}}}, S) ->
     %% - Notify owner application
     %% - Stop
     %%
-    S#state.owner ! {enet, disconnected, remote, self(), S#state.connect_id},
+    #state{
+       owner = Owner,
+       connect_id = ConnectID
+      } = S,
+    Owner ! {enet, disconnected, remote, self(), ConnectID},
     {stop, normal, S};
 
 connected(cast, {outgoing_command, {H, C = #unsequenced{}}}, S) ->
@@ -807,10 +815,7 @@ handle_event(cast, {incoming_packet, SentTime, Packet}, S) ->
     {keep_state, S};
 
 handle_event({call, From}, channels, S) ->
-    {keep_state, S, [{reply, From, S#state.channels}]};
-
-handle_event({call, From}, connect_id, S) ->
-    {keep_state, S, [{reply, From, S#state.connect_id}]}.
+    {keep_state, S, [{reply, From, S#state.channels}]}.
 
 
 start_channels(ChannelSup, N, Owner) ->
