@@ -117,8 +117,8 @@
 
 -record(unreliable,
         {
-          unreliable_sequence_number = 0,
-          data                       = <<>>
+          sequence_number = 0,
+          data            = <<>>
         }).
 
 

@@ -118,7 +118,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
 
         {recv_unreliable, {
            #command_header{},
-           C = #unreliable{ unreliable_sequence_number = N }
+           C = #unreliable{ sequence_number = N }
           }} ->
             if N < S#state.incoming_unreliable_sequence_number ->
                     %% Data is old - drop it and continue.

@@ -149,14 +149,14 @@ send_unsequenced(ChannelID, Data) ->
         }
     }.
 
-send_unreliable(ChannelID, UnreliableSequenceNumber, Data) ->
+send_unreliable(ChannelID, SequenceNumber, Data) ->
     {
       #command_header{
          command = ?COMMAND_SEND_UNRELIABLE,
          channel_id = ChannelID
         },
       #unreliable{
-         unreliable_sequence_number = UnreliableSequenceNumber,
+         sequence_number = SequenceNumber,
          data = Data
         }
     }.

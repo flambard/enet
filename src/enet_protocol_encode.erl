@@ -93,7 +93,7 @@ command(C = #reliable{}) ->
                    C#reliable.data);
 
 command(C = #unreliable{}) ->
-    ?SEND_UNRELIABLE(C#unreliable.unreliable_sequence_number,
+    ?SEND_UNRELIABLE(C#unreliable.sequence_number,
                      byte_size(C#unreliable.data),
                      C#unreliable.data);
 

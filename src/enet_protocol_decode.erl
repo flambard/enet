@@ -145,13 +145,12 @@ command(?COMMAND_SEND_RELIABLE,
     {ok, Command, Rest};
 
 command(?COMMAND_SEND_UNRELIABLE,
-        ?SEND_UNRELIABLE(UnreliableSequenceNumber, DataLength, DataRest)) ->
+        ?SEND_UNRELIABLE(SequenceNumber, DataLength, DataRest)) ->
     <<Data:DataLength/binary, Rest/binary>> = DataRest,
-    Command =
-        #unreliable{
-           unreliable_sequence_number = UnreliableSequenceNumber,
-           data = Data
-          },
+    Command = #unreliable{
+                 sequence_number = SequenceNumber,
+                 data = Data
+                },
     {ok, Command, Rest};
 
 command(?COMMAND_SEND_UNSEQUENCED,
