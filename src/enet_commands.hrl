@@ -128,8 +128,8 @@
 
 -record(unsequenced,
         {
-          unsequenced_group = 0,
-          data              = <<>>
+          group = 0,
+          data  = <<>>
         }).
 
 

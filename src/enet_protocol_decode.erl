@@ -158,7 +158,7 @@ command(?COMMAND_SEND_UNSEQUENCED,
     <<Data:DataLength/binary, Rest/binary>> = DataRest,
     Command =
         #unsequenced{
-           unsequenced_group = UnsequencedGroup,
+           group = UnsequencedGroup,
            data = Data
           },
     {ok, Command, Rest};

@@ -98,7 +98,7 @@ command(C = #unreliable{}) ->
                      C#unreliable.data);
 
 command(C = #unsequenced{}) ->
-    ?SEND_UNSEQUENCED(C#unsequenced.unsequenced_group,
+    ?SEND_UNSEQUENCED(C#unsequenced.group,
                       byte_size(C#unsequenced.data),
                       C#unsequenced.data);
 

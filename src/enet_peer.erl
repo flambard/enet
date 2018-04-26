@@ -598,7 +598,7 @@ connected(cast, {outgoing_command, {H, C = #unsequenced{}}}, S) ->
        remote_peer_id = RemotePeerID,
        outgoing_unsequenced_group = Group
       } = S,
-    C1 = C#unsequenced{ unsequenced_group = Group },
+    C1 = C#unsequenced{ group = Group },
     HBin = enet_protocol_encode:command_header(H),
     CBin = enet_protocol_encode:command(C1),
     Data = [HBin, CBin],
