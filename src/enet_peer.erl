@@ -377,7 +377,7 @@ acknowledging_verify_connect(
        outgoing_bandwidth           = OutgoingBandwidth,
        packet_throttle_interval     = ThrottleInterval,
        packet_throttle_acceleration = ThrottleAcceleration,
-       packet_throttle_deceleration = ThrottleDecelaration,
+       packet_throttle_deceleration = ThrottleDeceleration,
        connect_id                   = ConnectID
       } = C,
     %%
@@ -401,7 +401,7 @@ acknowledging_verify_connect(
            outgoing_bandwidth           = OutgoingBandwidth,
            packet_throttle_interval     = ThrottleInterval,
            packet_throttle_acceleration = ThrottleAcceleration,
-           packet_throttle_deceleration = ThrottleDecelaration,
+           packet_throttle_deceleration = ThrottleDeceleration,
            connect_id                   = ConnectID
            %% ---
           } when
