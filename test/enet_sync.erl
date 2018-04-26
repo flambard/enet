@@ -1,6 +1,6 @@
 -module(enet_sync).
 
--include("../src/enet_commands.hrl").
+-include_lib("enet/include/enet.hrl").
 
 -export([
          connect/3,
