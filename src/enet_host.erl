@@ -12,7 +12,6 @@
          stop/1,
          connect/4,
          sync_connect/4,
-         set_remote_peer_id/2,
          send_outgoing_commands/4,
          send_outgoing_commands/5,
          set_disconnect_trigger/4,
@@ -74,9 +73,6 @@ sync_connect(Host, IP, Port, ChannelCount) ->
                     {error, timeout}
             end
     end.
-
-set_remote_peer_id(Host, RemotePeerID) ->
-    gen_server:call(Host, {set_remote_peer_id, RemotePeerID}).
 
 send_outgoing_commands(Host, Commands, IP, Port) ->
     send_outgoing_commands(Host, Commands, IP, Port, ?NULL_PEER_ID).
@@ -175,16 +171,6 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
                   Table, Sup, local, Channels, PeerID, IP, Port, Owner)
         end,
     {reply, Reply, S};
-
-handle_call({set_remote_peer_id, PeerID} , {PeerPid, _}, S) ->
-    %%
-    %% A Peer Controller wants to set its remote peer ID.
-    %%
-    %% - Update the Peer Table
-    %% - Return 'ok'
-    %%
-    enet_peer_table:set_remote_peer_id(S#state.peer_table, PeerPid, PeerID),
-    {reply, ok, S};
 
 handle_call({send_outgoing_commands, Commands, IP, Port, ID}, _From, S) ->
     %%
