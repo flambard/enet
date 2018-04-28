@@ -151,7 +151,6 @@ init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
     %% - Send a Connect command to the remote peer (use peer ID)
     %% - Start in the 'connecting' state
     %%
-    ok = gen_statem:cast(self(), send_connect),
     Channels = start_channels(ChannelSup, N, Owner),
     <<ConnectID:32>> = crypto:strong_rand_bytes(4),
     true = gproc:mreg(p, l, [
@@ -187,14 +186,14 @@ init({remote_connect, Host, ChannelSup, _N, PeerID, IP, Port, Owner}) ->
 
 
 callback_mode() ->
-    state_functions.
+    [state_functions, state_enter].
 
 
 %%%
 %%% Connecting state
 %%%
 
-connecting(cast, send_connect, S) ->
+connecting(enter, _OldState, S) ->
     %%
     %% Sending the initial Connect command.
     %%
@@ -267,6 +266,9 @@ connecting(EventType, EventContent, S) ->
 %%%
 %%% Acknowledging Connect state
 %%%
+
+acknowledging_connect(enter, _OldState, S) ->
+    {keep_state, S};
 
 acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
     %%
@@ -355,6 +357,9 @@ acknowledging_connect(EventType, EventContent, S) ->
 %%% Acknowledging Verify Connect state
 %%%
 
+acknowledging_verify_connect(enter, _OldState, S) ->
+    {keep_state, S};
+
 acknowledging_verify_connect(
   cast, {incoming_command, {_H, C = #verify_connect{}}}, S) ->
     %%
@@ -425,6 +430,9 @@ acknowledging_verify_connect(EventType, EventContent, S) ->
 %%% Verifying Connect state
 %%%
 
+verifying_connect(enter, _OldState, S) ->
+    {keep_state, S};
+
 verifying_connect(cast, {incoming_command, {H, C = #acknowledge{}}}, S) ->
     %%
     %% Received an Acknowledge command in the 'verifying_connect' state.
@@ -454,6 +462,9 @@ verifying_connect(EventType, EventContent, S) ->
 %%%
 %%% Connected state
 %%%
+
+connected(enter, _OldState, S) ->
+    {keep_state, S};
 
 connected(cast, {incoming_command, {_H, #ping{}}}, S) ->
     %%
@@ -736,6 +747,9 @@ connected(EventType, EventContent, S) ->
 %%%
 %%% Disconnecting state
 %%%
+
+disconnecting(enter, _OldState, S) ->
+    {keep_state, S};
 
 disconnecting(cast, {incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %%
