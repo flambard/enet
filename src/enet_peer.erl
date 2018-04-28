@@ -454,13 +454,12 @@ connected(enter, _OldState, S) ->
        remote_peer_id = RemotePeerID,
        connect_id = ConnectID
       } = S,
-    true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
     true = gproc:mreg(p, l, [
                              {connect_id, ConnectID},
                              {remote_host_port, Port},
                              {remote_peer_id, RemotePeerID}
                             ]),
-    ok = enet_host:set_remote_peer_id(Host, RemotePeerID),
+    ok = enet_host:set_disconnect_trigger(Host, RemotePeerID, IP, Port),
     {keep_state, S};
 
 connected(cast, {incoming_command, {_H, #ping{}}}, S) ->
@@ -584,8 +583,13 @@ connected(cast, {incoming_command, {_H, #disconnect{}}}, S) ->
     %%
     #state{
        owner = Owner,
+       host = Host,
+       ip = IP,
+       port = Port,
+       remote_peer_id = RemotePeerID,
        connect_id = ConnectID
       } = S,
+    ok = enet_host:unset_disconnect_trigger(Host, RemotePeerID, IP, Port),
     Owner ! {enet, disconnected, remote, self(), ConnectID},
     {stop, normal, S};
 
@@ -746,6 +750,13 @@ connected(EventType, EventContent, S) ->
 %%%
 
 disconnecting(enter, _OldState, S) ->
+    #state{
+       host = Host,
+       ip = IP,
+       port = Port,
+       remote_peer_id = RemotePeerID
+      } = S,
+    ok = enet_host:unset_disconnect_trigger(Host, RemotePeerID, IP, Port),
     {keep_state, S};
 
 disconnecting(cast, {incoming_command, {_H, _C = #acknowledge{}}}, S) ->
