@@ -153,10 +153,6 @@ init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
     %%
     Channels = start_channels(ChannelSup, N, Owner),
     <<ConnectID:32>> = crypto:strong_rand_bytes(4),
-    true = gproc:mreg(p, l, [
-                             {connect_id, ConnectID},
-                             {remote_host_port, Port}
-                            ]),
     S = #state{
            owner = Owner,
            channel_sup = ChannelSup,
@@ -173,7 +169,6 @@ init({remote_connect, Host, ChannelSup, _N, PeerID, IP, Port, Owner}) ->
     %%
     %% Describe
     %%
-    gproc:reg({p, l, remote_host_port}, Port),
     S = #state{
            owner = Owner,
            host = Host,
@@ -304,12 +299,7 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
        outgoing_session_id = OutgoingSessionID,
        outgoing_reliable_sequence_number = SequenceNr
       } = S,
-    true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
-    true = gproc:mreg(p, l, [
-                             {connect_id, ConnectID},
-                             {mtu, MTU},
-                             {remote_peer_id, RemotePeerID}
-                            ]),
+    gproc:reg({p, l, mtu}, MTU),
     HostChannelLimit = enet_host:get_channel_limit(Host),
     HostIncomingBandwidth = enet_host:get_incoming_bandwidth(Host),
     HostOutgoingBandwidth = enet_host:get_outgoing_bandwidth(Host),
@@ -326,7 +316,6 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
     Data = [HBin, CBin],
     {sent_time, SentTime} =
         enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
-    ok = enet_host:set_remote_peer_id(Host, RemotePeerID),
     Channels = start_channels(ChannelSup, ChannelCount, Owner),
     ChannelID = 16#FF,
     VerifyConnectTimeout =
@@ -393,10 +382,7 @@ acknowledging_verify_connect(
     LocalMTU = get_mtu(self()),
     case S of
         #state{
-           ip                           = IP,
-           port                         = Port,
            owner                        = Owner,
-           host                         = Host,
            %% ---
            %% Fields below are matched against the values received in
            %% the Verify Connect command.
@@ -412,9 +398,6 @@ acknowledging_verify_connect(
           } when
               LocalChannelCount =:= RemoteChannelCount,
               LocalMTU =:= RemoteMTU ->
-            true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
-            true = gproc:reg({p, l, remote_peer_id}, RemotePeerID),
-            ok = enet_host:set_remote_peer_id(Host, RemotePeerID),
             Owner ! {enet, connect, local, {self(), Channels}, ConnectID},
             NewS = S#state{ remote_peer_id = RemotePeerID },
             {next_state, connected, NewS};
@@ -464,6 +447,20 @@ verifying_connect(EventType, EventContent, S) ->
 %%%
 
 connected(enter, _OldState, S) ->
+    #state{
+       host = Host,
+       ip = IP,
+       port = Port,
+       remote_peer_id = RemotePeerID,
+       connect_id = ConnectID
+      } = S,
+    true = gproc:reg({n, l, {RemotePeerID, IP, Port}}),
+    true = gproc:mreg(p, l, [
+                             {connect_id, ConnectID},
+                             {remote_host_port, Port},
+                             {remote_peer_id, RemotePeerID}
+                            ]),
+    ok = enet_host:set_remote_peer_id(Host, RemotePeerID),
     {keep_state, S};
 
 connected(cast, {incoming_command, {_H, #ping{}}}, S) ->
