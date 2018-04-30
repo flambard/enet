@@ -152,7 +152,6 @@ init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
     %% - Start in the 'connecting' state
     %%
     Channels = start_channels(ChannelSup, N, Owner),
-    <<ConnectID:32>> = crypto:strong_rand_bytes(4),
     S = #state{
            owner = Owner,
            channel_sup = ChannelSup,
@@ -160,8 +159,7 @@ init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
            host = Host,
            ip = IP,
            port = Port,
-           peer_id = PeerID,
-           connect_id = ConnectID
+           peer_id = PeerID
           },
     {ok, connecting, S};
 
@@ -203,13 +201,13 @@ connecting(enter, _OldState, S) ->
        packet_throttle_interval = PacketThrottleInterval,
        packet_throttle_acceleration = PacketThrottleAcceleration,
        packet_throttle_deceleration = PacketThrottleDeceleration,
-       outgoing_reliable_sequence_number = SequenceNr,
-       connect_id = ConnectID
+       outgoing_reliable_sequence_number = SequenceNr
       } = S,
     IncomingBandwidth = enet_host:get_incoming_bandwidth(Host),
     OutgoingBandwidth = enet_host:get_outgoing_bandwidth(Host),
     MTU = enet_host:get_mtu(Host),
     gproc:reg({p, l, mtu}, MTU),
+    <<ConnectID:32>> = crypto:strong_rand_bytes(4),
     {ConnectH, ConnectC} =
         enet_command:connect(
           PeerID,
@@ -233,7 +231,10 @@ connecting(enter, _OldState, S) ->
     ConnectTimeout =
         make_resend_timer(
           ChannelID, SentTime, SequenceNr, ?PEER_TIMEOUT_MINIMUM, Data),
-    NewS = S#state{ outgoing_reliable_sequence_number = SequenceNr + 1 },
+    NewS = S#state{
+             outgoing_reliable_sequence_number = SequenceNr + 1,
+             connect_id = ConnectID
+            },
     {keep_state, NewS, [ConnectTimeout]};
 
 connecting(cast, {incoming_command, {H, C = #acknowledge{}}}, S) ->
