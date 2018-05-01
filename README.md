@@ -29,11 +29,15 @@ start_host(Port, Options) -> {ok, pid()} | {error, atom()}
       {incoming_bandwidth, bytes_per_second()} |
       {outgoing_bandwidth, bytes_per_second()}
 ```
+Start a new host listening on `Port`.
+
 ```erlang
 stop_host(Port) -> ok
 
     Port = port_number()
 ```
+Stop a host listening on `Port`.
+
 ```erlang
 connect_peer(Host, IP, Port, ChannelCount) -> {ok, Peer} | {error, atom()}
 
@@ -42,6 +46,8 @@ connect_peer(Host, IP, Port, ChannelCount) -> {ok, Peer} | {error, atom()}
     Port = port_number()
     ChannelCount = channel_count()
 ```
+Start a new peer on `Host` connecting to a remote host on address `IP:Port`. If a successful connect handshake has been completed, the calling process will receive a message `{enet, connect, local, {Host, Channels}, ConnectID}`.
+
 ```erlang
 sync_connect_peer(Host, IP, Port, ChannelCount) -> {ok, {Peer, Channels}} | {error, atom()}
 
@@ -52,26 +58,35 @@ sync_connect_peer(Host, IP, Port, ChannelCount) -> {ok, {Peer, Channels}} | {err
     Peer = pid()
     Channels = channels()
 ```
+Equivalent to `connect_peer/4` but synchronous. The function returns when the handshake is completed or after a timeout.
+
 ```erlang
 disconnect_peer(Peer) -> ok
 
     Peer = pid()
 ```
+Disconnect `Peer`.
+
 ```erlang
 send_unsequenced(Channel, Data) -> ok
 
     Channel = pid()
     Data = iolist()
 ```
+Send *unsequenced* data to the remote peer over `Channel`.
+
 ```erlang
 send_unreliable(Channel, Data) -> ok
 
     Channel = pid()
     Data = iolist()
 ```
+Send *unreliable* data to the remote peer over `Channel`.
+
 ```erlang
 send_reliable(Channel, Data) -> ok
 
     Channel = pid()
     Data = iolist()
 ```
+Send *reliable* data to the remote peer over `Channel`.
