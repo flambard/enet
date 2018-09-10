@@ -21,11 +21,11 @@
 %% Protocol Header
 %%
 
--define(PROTOCOL_HEADER(Compressed, SentTimeIncluded, SessionID, PeerID,
+-define(PROTOCOL_HEADER(SentTimeIncluded, Compressed, SessionID, PeerID,
                         Rest),
         <<
-          (Compressed)       :1,
           (SentTimeIncluded) :1,
+          (Compressed)       :1,
           (SessionID)        :2,
           (PeerID)           :12,
           (Rest)             /binary

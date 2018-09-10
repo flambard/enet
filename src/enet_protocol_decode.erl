@@ -14,7 +14,7 @@
 %%% Protocol Header
 %%%
 
-protocol_header(?PROTOCOL_HEADER(Compressed, 0, SessionID, PeerID, Commands)) ->
+protocol_header(?PROTOCOL_HEADER(0, Compressed, SessionID, PeerID, Commands)) ->
     Header = #protocol_header{
                 compressed = Compressed,
                 session_id = SessionID,
@@ -22,7 +22,7 @@ protocol_header(?PROTOCOL_HEADER(Compressed, 0, SessionID, PeerID, Commands)) ->
                },
     {ok, Header, Commands};
 
-protocol_header(?PROTOCOL_HEADER(Compressed, 1, SessionID, PeerID, Rest)) ->
+protocol_header(?PROTOCOL_HEADER(1, Compressed, SessionID, PeerID, Rest)) ->
     <<SentTime:16, Commands/binary>> = Rest,
     Header = #protocol_header{
                 compressed = Compressed,

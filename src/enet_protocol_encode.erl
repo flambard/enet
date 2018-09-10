@@ -14,15 +14,15 @@
 %%%
 
 protocol_header(PH = #protocol_header{ sent_time = undefined }) ->
-    ?PROTOCOL_HEADER(PH#protocol_header.compressed,
-                     0,
+    ?PROTOCOL_HEADER(0,
+                     PH#protocol_header.compressed,
                      PH#protocol_header.session_id,
                      PH#protocol_header.peer_id,
                      <<>>);
 
 protocol_header(PH = #protocol_header{ sent_time = SentTime }) ->
-    ?PROTOCOL_HEADER(PH#protocol_header.compressed,
-                     1,
+    ?PROTOCOL_HEADER(1,
+                     PH#protocol_header.compressed,
                      PH#protocol_header.session_id,
                      PH#protocol_header.peer_id,
                      <<SentTime:16>>).
