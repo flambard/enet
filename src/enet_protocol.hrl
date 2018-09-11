@@ -146,7 +146,7 @@
 
 -define(SEND_RELIABLE(DataLength, Data),
         <<
-          (DataLength) :32,
+          (DataLength) :16,
           (Data)       /binary
         >>
        ).
