@@ -29,10 +29,10 @@
           id,
           peer,
           owner,
-          incoming_reliable_sequence_number = 0,
+          incoming_reliable_sequence_number = 1,
           incoming_unreliable_sequence_number = 0,
-          outgoing_reliable_sequence_number = 0,
-          outgoing_unreliable_sequence_number = 0,
+          outgoing_reliable_sequence_number = 1,
+          outgoing_unreliable_sequence_number = 1,
           reliable_windows, %% reliableWindows [ENET_PEER_RELIABLE_WINDOWS] (uint16 * 16 = 32 bytes)
           used_reliable_windows = 0,
           sys_parent,
