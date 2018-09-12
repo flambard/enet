@@ -17,9 +17,9 @@ remote_zero_peer_limit_test() ->
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 0}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     receive
-        {enet, connect, local, {LocalPeer, _LocalChannels}} ->
+        {enet, connect, local, {LocalPeer, _LocalChannels}, _ConnectID} ->
             exit(peer_could_connect_despite_peer_limit_reached);
-        {enet, connect, remote, _RemotePeer} ->
+        {enet, connect, remote, _RemotePeer, _ConnectID} ->
             exit(remote_peer_started_despite_peer_limit_reached)
     after 200 -> %% How long time is enough? (This is ugly)
             ok
@@ -31,14 +31,15 @@ async_connect_and_local_disconnect_test() ->
     {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
-    receive
-        {enet, connect, local, {LocalPeer, _LocalChannels}} -> ok
-    after 1000 ->
-            exit(local_peer_did_not_notify_owner)
-    end,
+    ConnectID =
+        receive
+            {enet, connect, local, {LocalPeer, _LocalChannels}, C} -> C
+        after 1000 ->
+                exit(local_peer_did_not_notify_owner)
+        end,
     RemotePeer =
         receive
-            {enet, connect, remote, {P, _RemoteChannels}} -> P
+            {enet, connect, remote, {P, _RemoteChannels}, ConnectID} -> P
         after 1000 ->
                 exit(remote_peer_did_not_notify_owner)
         end,
@@ -46,12 +47,12 @@ async_connect_and_local_disconnect_test() ->
     Ref2 = monitor(process, RemotePeer),
     ok = enet:disconnect_peer(LocalPeer),
     receive
-        {enet, disconnected, local} -> ok
+        {enet, disconnected, local, LocalPeer, ConnectID} -> ok
     after 1000 ->
             exit(local_peer_did_not_notify_owner)
     end,
     receive
-        {enet, disconnected, remote} -> ok
+        {enet, disconnected, remote, RemotePeer, ConnectID} -> ok
     after 1000 ->
             exit(remote_peer_did_not_notify_owner)
     end,
@@ -74,9 +75,9 @@ sync_connect_and_remote_disconnect_test() ->
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}]),
     {ok, {LocalPeer, _LocalChannels}} =
         enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
-    RemotePeer =
+    {RemotePeer, ConnectID} =
         receive
-            {enet, connect, remote, {P, _RemoteChannels}} -> P
+            {enet, connect, remote, {P, _RemoteChannels}, C} -> {P, C}
         after 1000 ->
                 exit(remote_peer_did_not_notify_owner)
         end,
@@ -84,12 +85,12 @@ sync_connect_and_remote_disconnect_test() ->
     Ref2 = monitor(process, RemotePeer),
     ok = enet:disconnect_peer(RemotePeer),
     receive
-        {enet, disconnected, local} -> ok
+        {enet, disconnected, local, _LocalPeer, ConnectID} -> ok
     after 1000 ->
             exit(local_peer_did_not_notify_owner)
     end,
     receive
-        {enet, disconnected, remote} -> ok
+        {enet, disconnected, remote, _RemotePeer, ConnectID} -> ok
     after 1000 ->
             exit(remote_peer_did_not_notify_owner)
     end,
@@ -115,7 +116,7 @@ unsequenced_messages_test() ->
         enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     {_RemotePeer, RemoteChannels} =
         receive
-            {enet, connect, remote, PC} -> PC
+            {enet, connect, remote, PC, _} -> PC
         after 1000 ->
                 exit(remote_peer_did_not_notify_owner)
         end,
@@ -144,7 +145,7 @@ unreliable_messages_test() ->
         enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     {_RemotePeer, RemoteChannels} =
         receive
-            {enet, connect, remote, PC} -> PC
+            {enet, connect, remote, PC, _} -> PC
         after 1000 ->
                 exit(remote_peer_did_not_notify_owner)
         end,
@@ -185,7 +186,7 @@ reliable_messages_test() ->
         enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     {_RemotePeer, RemoteChannels} =
         receive
-            {enet, connect, remote, PC} -> PC
+            {enet, connect, remote, PC, _} -> PC
         after 1000 ->
                 exit(remote_peer_did_not_notify_owner)
         end,
