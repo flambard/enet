@@ -9,7 +9,6 @@
 -export([
          start_link/3,
          start_link/4,
-         stop/1,
          connect/4,
          sync_connect/4,
          send_outgoing_commands/4,
@@ -55,9 +54,6 @@ start_link(Owner, Port, PeerSup) ->
 
 start_link(Owner, Port, PeerSup, Options) ->
     gen_server:start_link(?MODULE, {Owner, Port, PeerSup, Options}, []).
-
-stop(Host) ->
-    gen_server:call(Host, stop).
 
 connect(Host, IP, Port, ChannelCount) ->
     gen_server:call(Host, {connect, IP, Port, ChannelCount, self()}).
@@ -148,12 +144,6 @@ init({Owner, Port, PeerSup, Options}) ->
             peer_table = enet_peer_table:new(PeerLimit)
            }}.
 
-handle_call(stop, _From, S) ->
-    %%
-    %% Describe
-    %%
-    ok = gen_udp:close(S#state.socket),
-    {stop, normal, ok, S};
 
 handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
     %%
