@@ -157,7 +157,10 @@ handle_call(stop, _From, S) ->
 
 handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
     %%
-    %% Describe
+    %% Connect to a remote peer.
+    %%
+    %% - Allocate a slot in the peer table
+    %% - Start the peer process
     %%
     #state{
        peer_table = Table,

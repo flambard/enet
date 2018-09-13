@@ -165,7 +165,10 @@ init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
 
 init({remote_connect, Host, ChannelSup, _N, PeerID, IP, Port, Owner}) ->
     %%
-    %% Describe
+    %% A remote peer wants to connect to the client application.
+    %%
+    %% - Start in the 'acknowledging_connect' state
+    %% - Handle the received Connect command
     %%
     S = #state{
            owner = Owner,
@@ -540,7 +543,7 @@ connected(cast, {incoming_command, {H, C = #unsequenced{}}}, S) ->
     %%
     %% Received Send Unsequenced command.
     %%
-    %% TODO: Describe.
+    %% - Forward the command to the relevant channel
     %% - Reset the receive-timer
     %%
     #command_header{ channel_id = ChannelID } = H,
@@ -553,7 +556,7 @@ connected(cast, {incoming_command, {H, C = #unreliable{}}}, S) ->
     %%
     %% Received Send Unreliable command.
     %%
-    %% TODO: Describe.
+    %% - Forward the command to the relevant channel
     %% - Reset the receive-timer
     %%
     #command_header{ channel_id = ChannelID } = H,
@@ -566,7 +569,7 @@ connected(cast, {incoming_command, {H, C = #reliable{}}}, S) ->
     %%
     %% Received Send Reliable command.
     %%
-    %% TODO: Describe.
+    %% - Forward the command to the relevant channel
     %% - Reset the receive-timer
     %%
     #command_header{ channel_id = ChannelID } = H,
@@ -625,7 +628,7 @@ connected(cast, {outgoing_command, {H, C = #unreliable{}}}, S) ->
     %%
     %% Sending a Sequenced, unreliable command.
     %%
-    %% TODO: Describe.
+    %% - Forward the encoded command to the host
     %% - Reset the send-timer
     %%
     #state{
@@ -646,7 +649,7 @@ connected(cast, {outgoing_command, {H, C = #reliable{}}}, S) ->
     %%
     %% Sending a Sequenced, reliable command.
     %%
-    %% TODO: Describe.
+    %% - Forward the encoded command to the host
     %% - Reset the send-timer
     %%
     #state{
