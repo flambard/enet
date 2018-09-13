@@ -43,7 +43,7 @@ start_peer(
         start_link,
         [LocalOrRemote, Host, ChannelSup, N, PeerID, IP, Port, Owner]
        },
-      restart => permanent,
+      restart => transient,
       shutdown => 1000,
       type => worker,
       modules => [enet_peer]
