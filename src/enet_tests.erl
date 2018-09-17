@@ -125,12 +125,16 @@ unsequenced_messages_test() ->
     ok = enet:send_unsequenced(LocalChannel1, <<"local->remote">>),
     ok = enet:send_unsequenced(RemoteChannel1, <<"remote->local">>),
     receive
-        {enet, 0, #unsequenced{ data = <<"local->remote">> }} -> ok
+        {enet, ChannelWhichShouldBeRemote, #unsequenced{ data = <<"local->remote">> }
+        } when ChannelWhichShouldBeRemote =:= RemoteChannel1 ->
+            ok
     after 500 ->
             exit(remote_channel_did_not_send_data_to_owner)
     end,
     receive
-        {enet, 0, #unsequenced{ data = <<"remote->local">> }} -> ok
+        {enet, ChannelWhichShouldBeLocal, #unsequenced{ data = <<"remote->local">> }
+        } when ChannelWhichShouldBeLocal =:= LocalChannel1 ->
+            ok
     after 500 ->
             exit(local_channel_did_not_send_data_to_owner)
     end,
@@ -156,22 +160,30 @@ unreliable_messages_test() ->
     ok = enet:send_unreliable(LocalChannel1, <<"local->remote 2">>),
     ok = enet:send_unreliable(RemoteChannel1, <<"remote->local 2">>),
     receive
-        {enet, 0, #unreliable{ data = <<"local->remote 1">> }} -> ok
+        {enet, ChannelWhichShouldBeRemote1, #unreliable{ data = <<"local->remote 1">> }
+        } when ChannelWhichShouldBeRemote1 =:= RemoteChannel1 ->
+            ok
     after 500 ->
             exit(remote_channel_did_not_send_data_to_owner)
     end,
     receive
-        {enet, 0, #unreliable{ data = <<"remote->local 1">> }} -> ok
+        {enet, ChannelWhichShouldBeLocal1, #unreliable{ data = <<"remote->local 1">> }
+        } when ChannelWhichShouldBeLocal1 =:= LocalChannel1 ->
+            ok
     after 500 ->
             exit(local_channel_did_not_send_data_to_owner)
     end,
     receive
-        {enet, 0, #unreliable{ data = <<"local->remote 2">> }} -> ok
+        {enet, ChannelWhichShouldBeRemote2, #unreliable{ data = <<"local->remote 2">> }
+        } when ChannelWhichShouldBeRemote2 =:= RemoteChannel1 ->
+            ok
     after 500 ->
             exit(remote_channel_did_not_send_data_to_owner)
     end,
     receive
-        {enet, 0, #unreliable{ data = <<"remote->local 2">> }} -> ok
+        {enet, ChannelWhichShouldBeLocal2, #unreliable{ data = <<"remote->local 2">> }
+        } when ChannelWhichShouldBeLocal2 =:= LocalChannel1 ->
+            ok
     after 500 ->
             exit(local_channel_did_not_send_data_to_owner)
     end,
@@ -197,22 +209,30 @@ reliable_messages_test() ->
     ok = enet:send_reliable(LocalChannel1, <<"local->remote 2">>),
     ok = enet:send_reliable(RemoteChannel1, <<"remote->local 2">>),
     receive
-        {enet, 0, #reliable{ data = <<"local->remote 1">> }} -> ok
+        {enet, ChannelWhichShouldBeRemote1, #reliable{ data = <<"local->remote 1">> }
+        } when ChannelWhichShouldBeRemote1 =:= RemoteChannel1 ->
+            ok
     after 500 ->
             exit(remote_channel_did_not_send_data_to_owner)
     end,
     receive
-        {enet, 0, #reliable{ data = <<"remote->local 1">> }} -> ok
+        {enet, ChannelWhichShouldBeLocal1, #reliable{ data = <<"remote->local 1">> }
+        } when ChannelWhichShouldBeLocal1 =:= LocalChannel1 ->
+            ok
     after 500 ->
             exit(local_channel_did_not_send_data_to_owner)
     end,
     receive
-        {enet, 0, #reliable{ data = <<"local->remote 2">> }} -> ok
+        {enet, ChannelWhichShouldBeRemote2, #reliable{ data = <<"local->remote 2">> }
+        } when ChannelWhichShouldBeRemote2 =:= RemoteChannel1 ->
+            ok
     after 500 ->
             exit(remote_channel_did_not_send_data_to_owner)
     end,
     receive
-        {enet, 0, #reliable{ data = <<"remote->local 2">> }} -> ok
+        {enet, ChannelWhichShouldBeLocal2, #reliable{ data = <<"remote->local 2">> }
+        } when ChannelWhichShouldBeLocal2 =:= LocalChannel1 ->
+            ok
     after 500 ->
             exit(local_channel_did_not_send_data_to_owner)
     end,
