@@ -1,10 +1,49 @@
--module(enet_tests).
+-module(enet_api_SUITE).
+-compile(export_all).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("common_test/include/ct.hrl").
 -include_lib("enet/include/enet.hrl").
 
 
-local_zero_peer_limit_test() ->
+suite() ->
+    [{timetrap,{seconds,30}}].
+
+init_per_suite(Config) ->
+    application:ensure_all_started(enet),
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
+init_per_group(_GroupName, Config) ->
+    Config.
+
+end_per_group(_GroupName, _Config) ->
+    ok.
+
+init_per_testcase(_TestCase, Config) ->
+    Config.
+
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
+groups() ->
+    [].
+
+all() ->
+    [
+     local_zero_peer_limit_test,
+     remote_zero_peer_limit_test,
+     async_connect_and_local_disconnect_test,
+     sync_connect_and_remote_disconnect_test,
+     unsequenced_messages_test,
+     unreliable_messages_test,
+     reliable_messages_test
+    ].
+
+
+
+local_zero_peer_limit_test(_Config) ->
     {ok, LocalHost}   = enet:start_host(5001, [{peer_limit, 0}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 1}]),
     {error, reached_peer_limit} =
@@ -12,7 +51,7 @@ local_zero_peer_limit_test() ->
     ok = enet:stop_host(5001),
     ok = enet:stop_host(5002).
 
-remote_zero_peer_limit_test() ->
+remote_zero_peer_limit_test(_Config) ->
     {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 1}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 0}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
@@ -27,7 +66,7 @@ remote_zero_peer_limit_test() ->
     ok = enet:stop_host(5001),
     ok = enet:stop_host(5002).
 
-async_connect_and_local_disconnect_test() ->
+async_connect_and_local_disconnect_test(_Config) ->
     {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
@@ -70,7 +109,7 @@ async_connect_and_local_disconnect_test() ->
     ok = enet:stop_host(5002),
     ok.
 
-sync_connect_and_remote_disconnect_test() ->
+sync_connect_and_remote_disconnect_test(_Config) ->
     {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}]),
     {ok, {LocalPeer, _LocalChannels}} =
@@ -108,8 +147,7 @@ sync_connect_and_remote_disconnect_test() ->
     ok = enet:stop_host(5002),
     ok.
 
-
-unsequenced_messages_test() ->
+unsequenced_messages_test(_Config) ->
     {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}]),
     {ok, {_LocalPeer, LocalChannels}} =
@@ -138,7 +176,7 @@ unsequenced_messages_test() ->
     ok = enet:stop_host(5002),
     ok.
 
-unreliable_messages_test() ->
+unreliable_messages_test(_Config) ->
     {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}]),
     {ok, {_LocalPeer, LocalChannels}} =
@@ -179,7 +217,7 @@ unreliable_messages_test() ->
     ok = enet:stop_host(5002),
     ok.
 
-reliable_messages_test() ->
+reliable_messages_test(_Config) ->
     {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}]),
     {ok, {_LocalPeer, LocalChannels}} =
