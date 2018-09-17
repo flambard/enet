@@ -93,7 +93,7 @@ send_unsequenced(Channel, Data) ->
 send_unreliable(Channel, Data) ->
     enet:send_unreliable(Channel, Data),
     receive
-        {enet, _ID, #unreliable{ data = Data }} ->
+        {enet, _Channel, #unreliable{ data = Data }} ->
             ok
     after 1000 ->
             {error, data_not_received}
@@ -102,7 +102,7 @@ send_unreliable(Channel, Data) ->
 send_reliable(Channel, Data) ->
     enet:send_reliable(Channel, Data),
     receive
-        {enet, _ID, #reliable{ data = Data }} ->
+        {enet, _Channel, #reliable{ data = Data }} ->
             ok
     after 1000 ->
             {error, data_not_received}

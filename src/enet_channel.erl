@@ -109,7 +109,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
            #command_header{ unsequenced = 1 },
            C = #unsequenced{}
           }} ->
-            Owner ! {enet, ID, C},
+            Owner ! {enet, self(), C},
             loop(S);
         {send_unsequenced, Data} ->
             {H, C} = enet_command:send_unsequenced(ID, Data),
@@ -124,7 +124,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
                     %% Data is old - drop it and continue.
                     loop(S);
                true ->
-                    Owner ! {enet, ID, C},
+                    Owner ! {enet, self(), C},
                     NewS = S#state{ incoming_unreliable_sequence_number = N },
                     loop(NewS)
             end;
@@ -139,7 +139,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
            #command_header{ reliable_sequence_number = N },
            C = #reliable{}
           }} when N =:= S#state.incoming_reliable_sequence_number ->
-            Owner ! {enet, ID, C},
+            Owner ! {enet, self(), C},
             NewS = S#state{ incoming_reliable_sequence_number = N + 1 },
             loop(NewS);
         {send_reliable, Data} ->
