@@ -6,7 +6,7 @@
 
 %% API
 -export([
-         start_link/8,
+         start_link/9,
          disconnect/1,
          channels/1,
          recv_incoming_packet/3,
@@ -109,16 +109,16 @@
 %%% API
 %%%===================================================================
 
-start_link(local, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
+start_link(local, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
     gen_statem:start_link(
       ?MODULE,
-      {local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner},
+      {local_connect, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner},
       []);
 
-start_link(remote, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
+start_link(remote, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
     gen_statem:start_link(
       ?MODULE,
-      {remote_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner},
+      {remote_connect, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner},
       []).
 
 disconnect(Peer) ->
@@ -144,13 +144,14 @@ get_mtu(Peer) ->
 %%% gen_statem callbacks
 %%%===================================================================
 
-init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
+init({local_connect, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
     %%
     %% The client application wants to connect to a remote peer.
     %%
     %% - Send a Connect command to the remote peer (use peer ID)
     %% - Start in the 'connecting' state
     %%
+    gproc_pool:connect_worker(Host, {IP, Port, Ref}),
     Channels = start_channels(ChannelSup, N, Owner),
     S = #state{
            owner = Owner,
@@ -163,13 +164,14 @@ init({local_connect, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
           },
     {ok, connecting, S};
 
-init({remote_connect, Host, ChannelSup, _N, PeerID, IP, Port, Owner}) ->
+init({remote_connect, Ref, Host, ChannelSup, _N, PeerID, IP, Port, Owner}) ->
     %%
     %% A remote peer wants to connect to the client application.
     %%
     %% - Start in the 'acknowledging_connect' state
     %% - Handle the received Connect command
     %%
+    gproc_pool:connect_worker(Host, {IP, Port, Ref}),
     S = #state{
            owner = Owner,
            host = Host,

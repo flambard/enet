@@ -5,7 +5,7 @@
 -export([
          start_link/0,
          start_channel_supervisor/1,
-         start_peer/9
+         start_peer/10
         ]).
 
 %% Supervisor callbacks
@@ -34,14 +34,14 @@ start_channel_supervisor(Supervisor) ->
      },
     supervisor:start_child(Supervisor, Child).
 
-start_peer(
-  Supervisor, LocalOrRemote, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
+start_peer(Supervisor, Ref, LocalOrRemote, Host, ChannelSup, N, PeerID, IP,
+           Port, Owner) ->
     Child = #{
       id => PeerID,
       start => {
         enet_peer,
         start_link,
-        [LocalOrRemote, Host, ChannelSup, N, PeerID, IP, Port, Owner]
+        [LocalOrRemote, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner]
        },
       restart => transient,
       shutdown => 1000,

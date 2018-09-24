@@ -136,12 +136,12 @@ init({Owner, Port, PeerSup, Options}) ->
                      {active, true},
                      {reuseaddr, true}
                     ],
+    gproc_pool:new(self(), direct, [{size, PeerLimit}, {auto_size, false}]),
     {ok, Socket} = gen_udp:open(Port, SocketOptions),
     {ok, #state{
             owner = Owner,
             socket = Socket,
-            peer_sup = PeerSup,
-            peer_table = enet_peer_table:new(PeerLimit)
+            peer_sup = PeerSup
            }}.
 
 
@@ -153,15 +153,16 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
     %% - Start the peer process
     %%
     #state{
-       peer_table = Table,
        peer_sup = Sup
       } = S,
+    Ref = make_ref(),
     Reply =
-        case enet_peer_table:insert(Table, IP, Port) of
-            {error, table_full} -> {error, reached_peer_limit};
-            {ok, PeerID}        ->
-                start_peer(
-                  Table, Sup, local, Channels, PeerID, IP, Port, Owner)
+        try gproc_pool:add_worker(self(), {IP, Port, Ref}) of
+            PeerID ->
+                start_peer(Sup, local, Channels, PeerID, IP, Port, Ref, Owner)
+        catch
+            error:pool_full -> {error, reached_peer_limit};
+            error:exists    -> {error, exists}
         end,
     {reply, Reply, S};
 
@@ -235,7 +236,6 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
     #state{
        socket = Socket,
        decompress_fun = Decompress,
-       peer_table = PeerTable,
        owner = Owner,
        peer_sup = Sup
       } = S,
@@ -256,20 +256,24 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
         ?NULL_PEER_ID ->
             %% No particular peer is the receiver of this packet.
             %% Create a new peer.
-            case enet_peer_table:insert(PeerTable, IP, Port) of
-                {error, table_full} -> reached_peer_limit;
-                {ok, PeerID}        ->
+            Ref = make_ref(),
+            try gproc_pool:add_worker(self(), {IP, Port, Ref}) of
+                PeerID ->
                     %% Channel count is included in the Connect command
                     N = undefined,
                     {ok, Pid} =
                         start_peer(
-                          PeerTable, Sup, remote, N, PeerID, IP, Port, Owner),
+                          Sup, remote, N, PeerID, IP, Port, Ref, Owner),
                     ok = enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
+            catch
+                error:pool_full -> {error, reached_peer_limit};
+                error:exists    -> {error, exists}
             end;
         PeerID ->
-            #peer{ pid = Pid } =
-                enet_peer_table:lookup_by_id(PeerTable, PeerID),
-            ok = enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
+            case gproc_pool:pick_worker(self(), PeerID) of
+                false -> ok; %% Unknown peer - drop the packet
+                Pid   -> enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
+            end
     end,
     {noreply, S};
 
@@ -293,13 +297,13 @@ handle_info({gproc, unreg, _Ref, {n, l, {PeerID, IP, Port}}}, S) ->
     ok = gen_udp:send(Socket, IP, Port, Packet),
     {noreply, S};
 
-handle_info({gproc, unreg, _Ref, {n, l, {sup_of_peer, Pid}}}, S) ->
+handle_info({gproc, unreg, _Ref, {n, l, {sup_of_peer, {IP, Port, Ref}}}}, S) ->
     %%
     %% A Peer-Channel Supervisor process has exited.
     %%
     %% - Remove its Peer Controller from the Peer Table
     %%
-    _Peer = enet_peer_table:take(S#state.peer_table, Pid),
+    true = gproc_pool:remove_worker(self(), {IP, Port, Ref}),
     {noreply, S}.
 
 
@@ -308,6 +312,7 @@ handle_info({gproc, unreg, _Ref, {n, l, {sup_of_peer, Pid}}}, S) ->
 %%%
 
 terminate(_Reason, S) ->
+    gproc_pool:force_delete(self()),
     ok = gen_udp:close(S#state.socket).
 
 
@@ -326,13 +331,13 @@ code_change(_OldVsn, State, _Extra) ->
 get_time() ->
     erlang:system_time(1000) band 16#FFFF.
 
-start_peer(Table, PeerSup, LocalOrRemote, N, PeerID, IP, Port, Owner) ->
+start_peer(PeerSup, LocalOrRemote, N, PeerID, IP, Port, Ref, Owner) ->
     {ok, PCSup} = enet_peer_sup:start_peer_channel_supervisor(PeerSup, PeerID),
     {ok, ChannelSup} = enet_peer_channel_sup:start_channel_supervisor(PCSup),
     {ok, Pid} =
         enet_peer_channel_sup:start_peer(
-          PCSup, LocalOrRemote, self(), ChannelSup, N, PeerID, IP, Port, Owner),
-    true = gproc:reg_other({n, l, {sup_of_peer, Pid}}, PCSup),
-    _Ref = gproc:monitor({n, l, {sup_of_peer, Pid}}),
-    true = enet_peer_table:set_peer_pid(Table, PeerID, Pid),
+          PCSup, Ref, LocalOrRemote, self(), ChannelSup, N, PeerID, IP,
+          Port, Owner),
+    true = gproc:reg_other({n, l, {sup_of_peer, {IP, Port, Ref}}}, PCSup),
+    _Ref = gproc:monitor({n, l, {sup_of_peer, {IP, Port, Ref}}}),
     {ok, Pid}.
