@@ -37,7 +37,6 @@
           owner,
           socket,
           peer_sup,
-          peer_table,
           compress_fun,
           decompress_fun
         }).
@@ -149,7 +148,7 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
     %%
     %% Connect to a remote peer.
     %%
-    %% - Allocate a slot in the peer table
+    %% - Add a worker to the pool
     %% - Start the peer process
     %%
     #state{
@@ -301,7 +300,7 @@ handle_info({gproc, unreg, _Ref, {n, l, {sup_of_peer, {IP, Port, Ref}}}}, S) ->
     %%
     %% A Peer-Channel Supervisor process has exited.
     %%
-    %% - Remove its Peer Controller from the Peer Table
+    %% - Remove the worker from the pool
     %%
     true = gproc_pool:remove_worker(self(), {IP, Port, Ref}),
     {noreply, S}.
