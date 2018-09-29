@@ -296,9 +296,9 @@ handle_info({gproc, unreg, _Ref, {n, l, {PeerID, IP, Port}}}, S) ->
     ok = gen_udp:send(Socket, IP, Port, Packet),
     {noreply, S};
 
-handle_info({gproc, unreg, _Ref, {n, l, {sup_of_peer, {IP, Port, Ref}}}}, S) ->
+handle_info({gproc, unreg, _Ref, {n, l, {worker, {IP, Port, Ref}}}}, S) ->
     %%
-    %% A Peer-Channel Supervisor process has exited.
+    %% A Peer process has exited.
     %%
     %% - Remove the worker from the pool
     %%
@@ -331,12 +331,9 @@ get_time() ->
     erlang:system_time(1000) band 16#FFFF.
 
 start_peer(PeerSup, LocalOrRemote, N, PeerID, IP, Port, Ref, Owner) ->
-    {ok, PCSup} = enet_peer_sup:start_peer_channel_supervisor(PeerSup, PeerID),
-    {ok, ChannelSup} = enet_peer_channel_sup:start_channel_supervisor(PCSup),
     {ok, Pid} =
-        enet_peer_channel_sup:start_peer(
-          PCSup, Ref, LocalOrRemote, self(), ChannelSup, N, PeerID, IP,
-          Port, Owner),
-    true = gproc:reg_other({n, l, {sup_of_peer, {IP, Port, Ref}}}, PCSup),
-    _Ref = gproc:monitor({n, l, {sup_of_peer, {IP, Port, Ref}}}),
+        enet_peer_sup:start_peer(
+          PeerSup, Ref, LocalOrRemote, self(), N, PeerID, IP, Port, Owner),
+    true = gproc:reg_other({n, l, {worker, {IP, Port, Ref}}}, Pid),
+    _Ref = gproc:monitor({n, l, {worker, {IP, Port, Ref}}}),
     {ok, Pid}.

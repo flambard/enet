@@ -4,7 +4,7 @@
 %% API
 -export([
          start_link/0,
-         start_peer_channel_supervisor/2
+         start_peer/9
         ]).
 
 %% Supervisor callbacks
@@ -18,19 +18,19 @@
 start_link() ->
     supervisor:start_link(?MODULE, []).
 
-start_peer_channel_supervisor(Supervisor, ID) ->
+start_peer(Supervisor, Ref, LocalOrRemote, Host, N, PeerID, IP, Port, Owner) ->
     Child = #{
-      id => ID,
-      start => {
-        enet_peer_channel_sup,
-        start_link,
-        []
-       },
-      restart => temporary,
-      shutdown => infinity,
-      type => supervisor,
-      modules => [enet_peer_channel_sup]
-     },
+              id => PeerID,
+              start => {
+                        enet_peer,
+                        start_link,
+                        [LocalOrRemote, Ref, Host, N, PeerID, IP, Port, Owner]
+                       },
+              restart => temporary,
+              shutdown => 1000,
+              type => worker,
+              modules => [enet_peer]
+             },
     supervisor:start_child(Supervisor, Child).
 
 

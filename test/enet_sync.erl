@@ -25,13 +25,7 @@ connect(LocalHost, RemotePort, ChannelCount) ->
                             {error, remote_timeout}
                     end
             after 1000 ->
-                    PCSup = gproc:where({n, l, {sup_of_peer, LPeer}}),
-                    Ref = monitor(process, PCSup),
-                    true = exit(LPeer, kill),
-                    receive
-                        {'DOWN', Ref, process, PCSup, _Reason} ->
-                            {error, local_timeout}
-                    end
+                    true = exit(LPeer, kill)
             end
     end.
 

@@ -6,7 +6,7 @@
 
 %% API
 -export([
-         start_link/9,
+         start_link/8,
          disconnect/1,
          channels/1,
          recv_incoming_packet/3,
@@ -37,7 +37,6 @@
         {
           owner,
           host,
-          channel_sup,
           channels,
           ip,
           port,
@@ -109,16 +108,16 @@
 %%% API
 %%%===================================================================
 
-start_link(local, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
+start_link(local, Ref, Host, N, PeerID, IP, Port, Owner) ->
     gen_statem:start_link(
       ?MODULE,
-      {local_connect, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner},
+      {local_connect, Ref, Host, N, PeerID, IP, Port, Owner},
       []);
 
-start_link(remote, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner) ->
+start_link(remote, Ref, Host, N, PeerID, IP, Port, Owner) ->
     gen_statem:start_link(
       ?MODULE,
-      {remote_connect, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner},
+      {remote_connect, Ref, Host, N, PeerID, IP, Port, Owner},
       []).
 
 disconnect(Peer) ->
@@ -144,7 +143,7 @@ get_mtu(Peer) ->
 %%% gen_statem callbacks
 %%%===================================================================
 
-init({local_connect, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
+init({local_connect, Ref, Host, N, PeerID, IP, Port, Owner}) ->
     %%
     %% The client application wants to connect to a remote peer.
     %%
@@ -152,10 +151,9 @@ init({local_connect, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
     %% - Start in the 'connecting' state
     %%
     gproc_pool:connect_worker(Host, {IP, Port, Ref}),
-    Channels = start_channels(ChannelSup, N, Owner),
+    Channels = start_channels(N, Owner),
     S = #state{
            owner = Owner,
-           channel_sup = ChannelSup,
            channels = Channels,
            host = Host,
            ip = IP,
@@ -164,7 +162,7 @@ init({local_connect, Ref, Host, ChannelSup, N, PeerID, IP, Port, Owner}) ->
           },
     {ok, connecting, S};
 
-init({remote_connect, Ref, Host, ChannelSup, _N, PeerID, IP, Port, Owner}) ->
+init({remote_connect, Ref, Host, _N, PeerID, IP, Port, Owner}) ->
     %%
     %% A remote peer wants to connect to the client application.
     %%
@@ -175,7 +173,6 @@ init({remote_connect, Ref, Host, ChannelSup, _N, PeerID, IP, Port, Owner}) ->
     S = #state{
            owner = Owner,
            host = Host,
-           channel_sup = ChannelSup,
            ip = IP,
            port = Port,
            peer_id = PeerID
@@ -297,7 +294,6 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
     #state{
        owner = Owner,
        host = Host,
-       channel_sup = ChannelSup,
        ip = IP,
        port = Port,
        peer_id = PeerID,
@@ -322,7 +318,7 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
     Data = [HBin, CBin],
     {sent_time, SentTime} =
         enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
-    Channels = start_channels(ChannelSup, ChannelCount, Owner),
+    Channels = start_channels(ChannelCount, Owner),
     ChannelID = 16#FF,
     VerifyConnectTimeout =
         make_resend_timer(
@@ -852,13 +848,12 @@ handle_event({call, From}, channels, S) ->
     {keep_state, S, [{reply, From, S#state.channels}]}.
 
 
-start_channels(ChannelSup, N, Owner) ->
+start_channels(N, Owner) ->
     IDs = lists:seq(0, N-1),
     Channels =
         lists:map(
           fun (ID) ->
-                  {ok, Channel} = enet_channel_sup:start_channel(
-                                    ChannelSup, ID, self(), Owner),
+                  {ok, Channel} = enet_channel:start_link(ID, self(), Owner),
                   {ID, Channel}
           end,
           IDs),
