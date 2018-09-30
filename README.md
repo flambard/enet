@@ -68,6 +68,13 @@ disconnect_peer(Peer) -> ok
 Disconnect `Peer`.
 
 ```erlang
+disconnect_peer_now(Peer) -> ok
+
+    Peer = pid()
+```
+Disconnect `Peer` immediately without waiting for an ACK from the remote peer.
+
+```erlang
 send_unsequenced(Channel, Data) -> ok
 
     Channel = pid()

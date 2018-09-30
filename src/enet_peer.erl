@@ -8,6 +8,7 @@
 -export([
          start_link/8,
          disconnect/1,
+         disconnect_now/1,
          channels/1,
          recv_incoming_packet/3,
          send_command/2,
@@ -122,6 +123,9 @@ start_link(remote, Ref, Host, N, PeerID, IP, Port, Owner) ->
 
 disconnect(Peer) ->
     gen_statem:cast(Peer, disconnect).
+
+disconnect_now(Peer) ->
+    gen_statem:cast(Peer, disconnect_now).
 
 channels(Peer) ->
     gen_statem:call(Peer, channels).
@@ -690,6 +694,14 @@ connected(cast, disconnect, State) ->
     Data = [HBin, CBin],
     enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
     {next_state, disconnecting, State};
+
+connected(cast, disconnect_now, State) ->
+    %%
+    %% Disconnecting immediately.
+    %%
+    %% - Stop
+    %%
+    {stop, normal, State};
 
 connected({timeout, {ChannelID, SentTime, SequenceNr}}, Data, S) ->
     %%

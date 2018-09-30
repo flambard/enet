@@ -25,7 +25,7 @@ connect(LocalHost, RemotePort, ChannelCount) ->
                             {error, remote_timeout}
                     end
             after 1000 ->
-                    true = exit(LPeer, kill)
+                    true = exit(LPeer, normal)
             end
     end.
 
@@ -65,7 +65,7 @@ stop_host(Port) ->
     receive
         {'DOWN', Ref, process, Pid, shutdown} ->
             lists:foreach(fun ({P, R}) ->
-                                  exit(P, kill),
+                                  enet:disconnect_peer_now(P),
                                   receive
                                       {'DOWN', R, process, P, _Reason} -> ok
                                   end

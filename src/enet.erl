@@ -6,6 +6,7 @@
          connect_peer/4,
          sync_connect_peer/4,
          disconnect_peer/1,
+         disconnect_peer_now/1,
          send_unsequenced/2,
          send_unreliable/2,
          send_reliable/2
@@ -56,6 +57,12 @@ sync_connect_peer(Host, IP, Port, ChannelCount) ->
 
 disconnect_peer(Peer) ->
     enet_peer:disconnect(Peer).
+
+
+-spec disconnect_peer_now(Peer :: pid()) -> ok.
+
+disconnect_peer_now(Peer) ->
+    enet_peer:disconnect_now(Peer).
 
 
 -spec send_unsequenced(Channel :: pid(), Data :: iolist()) -> ok.
