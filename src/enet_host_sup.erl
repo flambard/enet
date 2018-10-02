@@ -3,8 +3,7 @@
 
 %% API
 -export([
-         start_link/1,
-         start_host/3
+         start_link/3
         ]).
 
 %% Supervisor callbacks
@@ -15,26 +14,15 @@
 %%% API functions
 %%%===================================================================
 
-start_link(Port) ->
-    supervisor:start_link(?MODULE, [Port]).
-
-start_host(Supervisor, Port, Options) ->
-    Child = #{
-      id => host,
-      start => {enet_host, start_link, [self(), Port, Options]},
-      restart => permanent,
-      shutdown => 2000,
-      type => worker,
-      modules => [enet_host]
-     },
-    supervisor:start_child(Supervisor, Child).
+start_link(Owner, Port, Options) ->
+    supervisor:start_link(?MODULE, [Owner, Port, Options]).
 
 
 %%%===================================================================
 %%% Supervisor callbacks
 %%%===================================================================
 
-init([Port]) ->
+init([Owner, Port, Options]) ->
     SupFlags = #{
       strategy => one_for_all,
       intensity => 0, %% <- Zero tolerance for crashes
@@ -52,7 +40,19 @@ init([Port]) ->
                 type => supervisor,
                 modules => [enet_peer_sup]
                },
-    {ok, {SupFlags, [PeerSup]}}.
+    Host = #{
+             id => host,
+             start => {
+                       enet_host,
+                       start_link,
+                       [Owner, Port, Options]
+                      },
+             restart => permanent,
+             shutdown => 2000,
+             type => worker,
+             modules => [enet_host]
+            },
+    {ok, {SupFlags, [PeerSup, Host]}}.
 
 
 %%%===================================================================

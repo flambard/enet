@@ -4,7 +4,7 @@
 %% API
 -export([
          start_link/0,
-         start_host_supervisor/1,
+         start_host_supervisor/3,
          stop_host_supervisor/1
         ]).
 
@@ -21,10 +21,10 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
-start_host_supervisor(ID) ->
+start_host_supervisor(Owner, ID, Options) ->
     Child = #{
       id => ID,
-      start => {enet_host_sup, start_link, [ID]},
+      start => {enet_host_sup, start_link, [Owner, ID, Options]},
       restart => temporary,
       shutdown => infinity,
       type => supervisor,

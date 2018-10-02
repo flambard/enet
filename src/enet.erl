@@ -20,12 +20,11 @@
                         {ok, pid()} | {error, atom()}.
 
 start_host(Port, Options) ->
-    {ok, HostSup} = enet_sup:start_host_supervisor(Port),
-    case enet_host_sup:start_host(HostSup, Port, Options) of
-        {ok, HostController} -> {ok, HostController};
-        {error, Reason} ->
-            ok = enet_sup:stop_host_supervisor(Port),
-            {error, Reason}
+    case enet_sup:start_host_supervisor(self(), Port, Options) of
+        {error, Reason} -> {error, Reason};
+        {ok, _HostSup} ->
+            Host = gproc:where({n, l, {enet_host, Port}}),
+            {ok, Host}
     end.
 
 

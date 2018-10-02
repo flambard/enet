@@ -102,6 +102,7 @@ get_channel_limit(Host) ->
 %%%===================================================================
 
 init({Owner, Port, Options}) ->
+    true = gproc:reg({n, l, {enet_host, Port}}),
     PeerLimit =
         case lists:keyfind(peer_limit, 1, Options) of
             {peer_limit, PLimit} -> PLimit;
