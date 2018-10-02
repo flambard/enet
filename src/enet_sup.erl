@@ -24,7 +24,7 @@ start_link() ->
 start_host_supervisor(ID) ->
     Child = #{
       id => ID,
-      start => {enet_host_sup, start_link, []},
+      start => {enet_host_sup, start_link, [ID]},
       restart => temporary,
       shutdown => infinity,
       type => supervisor,

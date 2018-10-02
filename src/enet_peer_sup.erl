@@ -3,7 +3,7 @@
 
 %% API
 -export([
-         start_link/0,
+         start_link/1,
          start_peer/9
         ]).
 
@@ -15,8 +15,8 @@
 %%% API functions
 %%%===================================================================
 
-start_link() ->
-    supervisor:start_link(?MODULE, []).
+start_link(Port) ->
+    supervisor:start_link(?MODULE, [Port]).
 
 start_peer(Supervisor, Ref, LocalOrRemote, Host, N, PeerID, IP, Port, Owner) ->
     Child = #{
@@ -38,7 +38,8 @@ start_peer(Supervisor, Ref, LocalOrRemote, Host, N, PeerID, IP, Port, Owner) ->
 %%% Supervisor callbacks
 %%%===================================================================
 
-init([]) ->
+init([Port]) ->
+    true = gproc:reg({n, l, {enet_peer_sup, Port}}),
     SupFlags = #{
       strategy => one_for_one,
       intensity => 1,

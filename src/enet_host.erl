@@ -7,8 +7,8 @@
 
 %% API
 -export([
+         start_link/2,
          start_link/3,
-         start_link/4,
          connect/4,
          sync_connect/4,
          send_outgoing_commands/4,
@@ -48,11 +48,11 @@
 %%% API
 %%%===================================================================
 
-start_link(Owner, Port, PeerSup) ->
-    start_link(Owner, Port, PeerSup, []).
+start_link(Owner, Port) ->
+    start_link(Owner, Port, []).
 
-start_link(Owner, Port, PeerSup, Options) ->
-    gen_server:start_link(?MODULE, {Owner, Port, PeerSup, Options}, []).
+start_link(Owner, Port, Options) ->
+    gen_server:start_link(?MODULE, {Owner, Port, Options}, []).
 
 connect(Host, IP, Port, ChannelCount) ->
     gen_server:call(Host, {connect, IP, Port, ChannelCount, self()}).
@@ -101,7 +101,7 @@ get_channel_limit(Host) ->
 %%% gen_server callbacks
 %%%===================================================================
 
-init({Owner, Port, PeerSup, Options}) ->
+init({Owner, Port, Options}) ->
     PeerLimit =
         case lists:keyfind(peer_limit, 1, Options) of
             {peer_limit, PLimit} -> PLimit;
@@ -137,6 +137,7 @@ init({Owner, Port, PeerSup, Options}) ->
                     ],
     gproc_pool:new(self(), direct, [{size, PeerLimit}, {auto_size, false}]),
     {ok, Socket} = gen_udp:open(Port, SocketOptions),
+    PeerSup = gproc:where({n, l, {enet_peer_sup, Port}}),
     {ok, #state{
             owner = Owner,
             socket = Socket,
