@@ -36,7 +36,6 @@
         {
           owner,
           socket,
-          peer_sup,
           compress_fun,
           decompress_fun
         }).
@@ -138,11 +137,9 @@ init({Owner, Port, Options}) ->
                     ],
     gproc_pool:new(self(), direct, [{size, PeerLimit}, {auto_size, false}]),
     {ok, Socket} = gen_udp:open(Port, SocketOptions),
-    PeerSup = gproc:where({n, l, {enet_peer_sup, Port}}),
     {ok, #state{
             owner = Owner,
-            socket = Socket,
-            peer_sup = PeerSup
+            socket = Socket
            }}.
 
 
@@ -153,14 +150,10 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
     %% - Add a worker to the pool
     %% - Start the peer process
     %%
-    #state{
-       peer_sup = Sup
-      } = S,
     Ref = make_ref(),
     Reply =
         try gproc_pool:add_worker(self(), {IP, Port, Ref}) of
-            PeerID ->
-                start_peer(Sup, local, Channels, PeerID, IP, Port, Ref, Owner)
+            PeerID -> start_peer(local, Channels, PeerID, IP, Port, Ref, Owner)
         catch
             error:pool_full -> {error, reached_peer_limit};
             error:exists    -> {error, exists}
@@ -237,8 +230,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
     #state{
        socket = Socket,
        decompress_fun = Decompress,
-       owner = Owner,
-       peer_sup = Sup
+       owner = Owner
       } = S,
     %% TODO: Replace call to enet_protocol_decode with binary pattern match.
     {ok,
@@ -263,8 +255,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                     %% Channel count is included in the Connect command
                     N = undefined,
                     {ok, Pid} =
-                        start_peer(
-                          Sup, remote, N, PeerID, IP, Port, Ref, Owner),
+                        start_peer(remote, N, PeerID, IP, Port, Ref, Owner),
                     ok = enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
             catch
                 error:pool_full -> {error, reached_peer_limit};
@@ -332,10 +323,12 @@ code_change(_OldVsn, State, _Extra) ->
 get_time() ->
     erlang:system_time(1000) band 16#FFFF.
 
-start_peer(PeerSup, LocalOrRemote, N, PeerID, IP, Port, Ref, Owner) ->
+start_peer(LocalOrRemote, N, PeerID, IP, RPort, Ref, Owner) ->
+    LocalPort = gproc:get_value({p, l, port}, self()),
+    PeerSup = gproc:where({n, l, {enet_peer_sup, LocalPort}}),
     {ok, Pid} =
         enet_peer_sup:start_peer(
-          PeerSup, Ref, LocalOrRemote, self(), N, PeerID, IP, Port, Owner),
-    true = gproc:reg_other({n, l, {worker, {IP, Port, Ref}}}, Pid),
-    _Ref = gproc:monitor({n, l, {worker, {IP, Port, Ref}}}),
+          PeerSup, Ref, LocalOrRemote, self(), N, PeerID, IP, RPort, Owner),
+    true = gproc:reg_other({n, l, {worker, {IP, RPort, Ref}}}, Pid),
+    _Ref = gproc:monitor({n, l, {worker, {IP, RPort, Ref}}}),
     {ok, Pid}.
