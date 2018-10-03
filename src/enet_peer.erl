@@ -6,7 +6,8 @@
 
 %% API
 -export([
-         start_link/8,
+         start_link_local/7,
+         start_link_remote/6,
          disconnect/1,
          disconnect_now/1,
          channels/1,
@@ -109,16 +110,16 @@
 %%% API
 %%%===================================================================
 
-start_link(local, Ref, Host, N, PeerID, IP, Port, Owner) ->
+start_link_local(Ref, Host, N, PeerID, IP, Port, Owner) ->
     gen_statem:start_link(
       ?MODULE,
       {local_connect, Ref, Host, N, PeerID, IP, Port, Owner},
-      []);
+      []).
 
-start_link(remote, Ref, Host, N, PeerID, IP, Port, Owner) ->
+start_link_remote(Ref, Host, PeerID, IP, Port, Owner) ->
     gen_statem:start_link(
       ?MODULE,
-      {remote_connect, Ref, Host, N, PeerID, IP, Port, Owner},
+      {remote_connect, Ref, Host, PeerID, IP, Port, Owner},
       []).
 
 disconnect(Peer) ->
@@ -166,7 +167,7 @@ init({local_connect, Ref, Host, N, PeerID, IP, Port, Owner}) ->
           },
     {ok, connecting, S};
 
-init({remote_connect, Ref, Host, _N, PeerID, IP, Port, Owner}) ->
+init({remote_connect, Ref, Host, PeerID, IP, Port, Owner}) ->
     %%
     %% A remote peer wants to connect to the client application.
     %%

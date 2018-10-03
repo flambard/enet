@@ -153,7 +153,7 @@ handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
     Ref = make_ref(),
     Reply =
         try gproc_pool:add_worker(self(), {IP, Port, Ref}) of
-            PeerID -> start_peer(local, Channels, PeerID, IP, Port, Ref, Owner)
+            PeerID -> start_peer_local(Channels, PeerID, IP, Port, Ref, Owner)
         catch
             error:pool_full -> {error, reached_peer_limit};
             error:exists    -> {error, exists}
@@ -252,10 +252,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
             Ref = make_ref(),
             try gproc_pool:add_worker(self(), {IP, Port, Ref}) of
                 PeerID ->
-                    %% Channel count is included in the Connect command
-                    N = undefined,
-                    {ok, Pid} =
-                        start_peer(remote, N, PeerID, IP, Port, Ref, Owner),
+                    {ok, Pid} = start_peer_remote(PeerID, IP, Port, Ref, Owner),
                     ok = enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
             catch
                 error:pool_full -> {error, reached_peer_limit};
@@ -323,12 +320,22 @@ code_change(_OldVsn, State, _Extra) ->
 get_time() ->
     erlang:system_time(1000) band 16#FFFF.
 
-start_peer(LocalOrRemote, N, PeerID, IP, RPort, Ref, Owner) ->
+start_peer_local(N, PeerID, IP, RPort, Ref, Owner) ->
     LocalPort = gproc:get_value({p, l, port}, self()),
     PeerSup = gproc:where({n, l, {enet_peer_sup, LocalPort}}),
     {ok, Pid} =
-        enet_peer_sup:start_peer(
-          PeerSup, Ref, LocalOrRemote, self(), N, PeerID, IP, RPort, Owner),
+        enet_peer_sup:start_peer_local(
+          PeerSup, Ref, self(), N, PeerID, IP, RPort, Owner),
+    true = gproc:reg_other({n, l, {worker, {IP, RPort, Ref}}}, Pid),
+    _Ref = gproc:monitor({n, l, {worker, {IP, RPort, Ref}}}),
+    {ok, Pid}.
+
+start_peer_remote(PeerID, IP, RPort, Ref, Owner) ->
+    LocalPort = gproc:get_value({p, l, port}, self()),
+    PeerSup = gproc:where({n, l, {enet_peer_sup, LocalPort}}),
+    {ok, Pid} =
+        enet_peer_sup:start_peer_remote(
+          PeerSup, Ref, self(), PeerID, IP, RPort, Owner),
     true = gproc:reg_other({n, l, {worker, {IP, RPort, Ref}}}, Pid),
     _Ref = gproc:monitor({n, l, {worker, {IP, RPort, Ref}}}),
     {ok, Pid}.
