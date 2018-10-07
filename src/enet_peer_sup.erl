@@ -28,7 +28,7 @@ start_peer_local(Supervisor, Ref, Host, N, PeerID, IP, Port, Owner) ->
                         [Ref, Host, N, PeerID, IP, Port, Owner]
                        },
               restart => temporary,
-              shutdown => 1000,
+              shutdown => brutal_kill,
               type => worker,
               modules => [enet_peer]
              },
@@ -43,7 +43,7 @@ start_peer_remote(Supervisor, Ref, Host, PeerID, IP, Port, Owner) ->
                         [Ref, Host, PeerID, IP, Port, Owner]
                        },
               restart => temporary,
-              shutdown => 1000,
+              shutdown => brutal_kill,
               type => worker,
               modules => [enet_peer]
              },
