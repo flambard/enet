@@ -14,7 +14,9 @@
          recv_incoming_packet/3,
          send_command/2,
          get_connect_id/1,
-         get_mtu/1
+         get_mtu/1,
+         get_worker_name/1,
+         get_peer_id/1
         ]).
 
 %% gen_statem callbacks
@@ -143,6 +145,12 @@ get_connect_id(Peer) ->
 get_mtu(Peer) ->
     gproc:get_value({p, l, mtu}, Peer).
 
+get_worker_name(Peer) ->
+    gproc:get_value({p, l, worker_name}, Peer).
+
+get_peer_id(Peer) ->
+    gproc:get_value({p, l, peer_id}, Peer).
+
 
 %%%===================================================================
 %%% gen_statem callbacks
@@ -156,6 +164,8 @@ init({local_connect, Ref, Host, N, PeerID, IP, Port, Owner}) ->
     %% - Start in the 'connecting' state
     %%
     gproc_pool:connect_worker(Host, {IP, Port, Ref}),
+    gproc:reg({p, l, worker_name}, {IP, Port, Ref}),
+    gproc:reg({p, l, peer_id}, PeerID),
     Channels = start_channels(N, Owner),
     S = #state{
            owner = Owner,
@@ -175,6 +185,8 @@ init({remote_connect, Ref, Host, PeerID, IP, Port, Owner}) ->
     %% - Handle the received Connect command
     %%
     gproc_pool:connect_worker(Host, {IP, Port, Ref}),
+    gproc:reg({p, l, worker_name}, {IP, Port, Ref}),
+    gproc:reg({p, l, peer_id}, PeerID),
     S = #state{
            owner = Owner,
            host = Host,
@@ -800,7 +812,9 @@ disconnecting(EventType, EventContent, S) ->
 %%% terminate
 %%%
 
-terminate(_Reason, _StateName, _State) ->
+terminate(_Reason, _StateName, #state{ host = Host }) ->
+    Name = get_worker_name(self()),
+    gproc_pool:disconnect_worker(Host, Name),
     ok.
 
 
