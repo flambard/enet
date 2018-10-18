@@ -27,7 +27,8 @@ start_host(Port, Options) -> {ok, pid()} | {error, atom()}
       {peer_limit, peer_count()} |
       {channel_limit, channel_count()} |
       {incoming_bandwidth, bytes_per_second()} |
-      {outgoing_bandwidth, bytes_per_second()}
+      {outgoing_bandwidth, bytes_per_second()} |
+      {connect_fun, fun((IP, Port)) -> pid()}
 ```
 Start a new host listening on `Port`.
 
@@ -46,7 +47,7 @@ connect_peer(Host, IP, Port, ChannelCount) -> {ok, Peer} | {error, atom()}
     Port = port_number()
     ChannelCount = channel_count()
 ```
-Start a new peer on `Host` connecting to a remote host on address `IP:Port`. If a successful connect handshake has been completed, the calling process will receive a message `{enet, connect, local, {Host, Channels}, ConnectID}`.
+Start a new peer on `Host` connecting to a remote host on address `IP:Port`. If a successful connect handshake has been completed, the `connect_fun` function is called and the `pid()` returned by that function will receive a message `{enet, connect, local, {Host, Channels}, ConnectID}`.
 
 ```erlang
 sync_connect_peer(Host, IP, Port, ChannelCount) -> {ok, {Peer, Channels}} | {error, atom()}
