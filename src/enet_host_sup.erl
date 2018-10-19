@@ -14,15 +14,15 @@
 %%% API functions
 %%%===================================================================
 
-start_link(Owner, Port, Options) ->
-    supervisor:start_link(?MODULE, [Owner, Port, Options]).
+start_link(Port, ConnectFun, Options) ->
+    supervisor:start_link(?MODULE, [Port, ConnectFun, Options]).
 
 
 %%%===================================================================
 %%% Supervisor callbacks
 %%%===================================================================
 
-init([Owner, Port, Options]) ->
+init([Port, ConnectFun, Options]) ->
     SupFlags = #{
       strategy => one_for_all,
       intensity => 0, %% <- Zero tolerance for crashes
@@ -33,7 +33,7 @@ init([Owner, Port, Options]) ->
              start => {
                        enet_host,
                        start_link,
-                       [Owner, Port, Options]
+                       [Port, ConnectFun, Options]
                       },
              restart => permanent,
              shutdown => 2000,

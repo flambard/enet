@@ -12,6 +12,7 @@
         ]).
 
 -export([
+         connect_fun/0,
          pretty_print_commands/1
         ]).
 
@@ -53,13 +54,15 @@ initial_state() ->
 %%%
 
 command(S = #state{ hosts = [] }) ->
-    {call, enet, start_host, [free_host_port(S), host_options()]};
+    {call, enet, start_host,
+     [free_host_port(S), symbolic_connect_fun(), host_options()]};
 
 command(S) ->
     Peers = [P || H <- S#state.hosts, P <- H#host.peers],
     oneof(
       [
-       {call, enet, start_host, [free_host_port(S), host_options()]},
+       {call, enet, start_host,
+        [free_host_port(S), symbolic_connect_fun(), host_options()]},
 
        ?LET(#host{ port = Port }, started_host(S),
             {call, enet_sync, stop_host, [Port]}),
@@ -117,7 +120,7 @@ precondition(_S, {call, _, _, _}) ->
 %%% State transitions
 %%%
 
-next_state(S, V, {call, _, start_host, [Port, Options]}) ->
+next_state(S, V, {call, _, start_host, [Port, _ConnectFun, Options]}) ->
     HostPid = {call, erlang, element, [2, V]},
     {peer_limit, PeerLimit} = lists:keyfind(peer_limit, 1, Options),
     {channel_limit, ChannelLimit} = lists:keyfind(channel_limit, 1, Options),
@@ -249,7 +252,7 @@ next_state(S, _V, {call, _, send_reliable, [_ChannelPid, _Data]}) ->
 %%% Post-conditions
 %%%
 
-postcondition(_S, {call, _, start_host, [_Port, _Options]}, Res) ->
+postcondition(_S, {call, _, start_host, [_Port, _ConnectFun, _Options]}, Res) ->
     case Res of
         {error, _Reason} -> false;
         {ok, _Pid}       -> true
@@ -340,8 +343,12 @@ free_host_port(#state{ hosts = Hosts }) ->
 busy_host_port(S = #state{}) ->
     ?LET(#host{ port = Port }, started_host(S), Port).
 
-message_data() ->
-    binary().
+symbolic_connect_fun() ->
+    {call, enet_model, connect_fun, []}.
+
+connect_fun() ->
+    Self = self(),
+    fun(_IP, _Port) -> Self end.
 
 host_options() ->
     [{peer_limit, integer(1, 255)}, {channel_limit, integer(1, 8)}].
@@ -378,6 +385,9 @@ channel_count(Limit) ->
 
 local_ip() ->
     "127.0.0.1".
+
+message_data() ->
+    binary().
 
 
 %%%

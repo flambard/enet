@@ -46,8 +46,8 @@ all() ->
 local_zero_peer_limit_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost}   = enet:start_host(5001, [{peer_limit, 0}, {connect_fun, ConnectFun}]),
-    {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 1}, {connect_fun, ConnectFun}]),
+    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 0}]),
+    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 1}]),
     {error, reached_peer_limit} =
         enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     ok = enet:stop_host(5001),
@@ -55,8 +55,8 @@ local_zero_peer_limit_test(_Config) ->
 
 remote_zero_peer_limit_test(_Config) ->
     ConnectFun = fun(_IP, _Port) -> self() end,
-    {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 1}, {connect_fun, ConnectFun}]),
-    {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 0}, {connect_fun, ConnectFun}]),
+    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 1}]),
+    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 0}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     receive
         {enet, connect, local, {LocalPeer, _LocalChannels}, _ConnectID} ->
@@ -72,8 +72,8 @@ remote_zero_peer_limit_test(_Config) ->
 async_connect_and_local_disconnect_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}, {connect_fun, ConnectFun}]),
-    {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}, {connect_fun, ConnectFun}]),
+    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
+    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     ConnectID =
         receive
@@ -117,8 +117,8 @@ async_connect_and_local_disconnect_test(_Config) ->
 sync_connect_and_remote_disconnect_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}, {connect_fun, ConnectFun}]),
-    {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}, {connect_fun, ConnectFun}]),
+    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
+    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
     {ok, {LocalPeer, _LocalChannels}} =
         enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     {RemotePeer, ConnectID} =
@@ -157,8 +157,8 @@ sync_connect_and_remote_disconnect_test(_Config) ->
 unsequenced_messages_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}, {connect_fun, ConnectFun}]),
-    {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}, {connect_fun, ConnectFun}]),
+    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
+    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
     {ok, {_LocalPeer, LocalChannels}} =
         enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     {_RemotePeer, RemoteChannels} =
@@ -188,8 +188,8 @@ unsequenced_messages_test(_Config) ->
 unreliable_messages_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}, {connect_fun, ConnectFun}]),
-    {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}, {connect_fun, ConnectFun}]),
+    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
+    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
     {ok, {_LocalPeer, LocalChannels}} =
         enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     {_RemotePeer, RemoteChannels} =
@@ -231,8 +231,8 @@ unreliable_messages_test(_Config) ->
 reliable_messages_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost} = enet:start_host(5001, [{peer_limit, 8}, {connect_fun, ConnectFun}]),
-    {ok, _RemoteHost} = enet:start_host(5002, [{peer_limit, 8}, {connect_fun, ConnectFun}]),
+    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
+    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
     {ok, {_LocalPeer, LocalChannels}} =
         enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
     {_RemotePeer, RemoteChannels} =

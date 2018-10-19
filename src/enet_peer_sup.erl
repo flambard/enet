@@ -19,12 +19,12 @@
 start_link(Port) ->
     supervisor:start_link(?MODULE, [Port]).
 
-start_peer_local(Supervisor, Ref, Host, N, PeerID, IP, Port, Owner) ->
-    Args = [local, Ref, Host, N, PeerID, IP, Port, Owner],
+start_peer_local(Supervisor, Ref, Host, N, PeerID, IP, Port, ConnectFun) ->
+    Args = [local, Ref, Host, N, PeerID, IP, Port, ConnectFun],
     supervisor:start_child(Supervisor, Args).
 
-start_peer_remote(Supervisor, Ref, Host, PeerID, IP, Port, Owner) ->
-    Args = [remote, Ref, Host, PeerID, IP, Port, Owner],
+start_peer_remote(Supervisor, Ref, Host, PeerID, IP, Port, ConnectFun) ->
+    Args = [remote, Ref, Host, PeerID, IP, Port, ConnectFun],
     supervisor:start_child(Supervisor, Args).
 
 

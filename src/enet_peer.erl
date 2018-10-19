@@ -112,16 +112,16 @@
 %%% API
 %%%===================================================================
 
-start_link(local, Ref, Host, N, PeerID, IP, Port, Owner) ->
+start_link(local, Ref, Host, N, PeerID, IP, Port, ConnectFun) ->
     gen_statem:start_link(
       ?MODULE,
-      {local_connect, Ref, Host, N, PeerID, IP, Port, Owner},
+      {local_connect, Ref, Host, N, PeerID, IP, Port, ConnectFun},
       []).
 
-start_link(remote, Ref, Host, PeerID, IP, Port, Owner) ->
+start_link(remote, Ref, Host, PeerID, IP, Port, ConnectFun) ->
     gen_statem:start_link(
       ?MODULE,
-      {remote_connect, Ref, Host, PeerID, IP, Port, Owner},
+      {remote_connect, Ref, Host, PeerID, IP, Port, ConnectFun},
       []).
 
 disconnect(Peer) ->
@@ -156,7 +156,7 @@ get_peer_id(Peer) ->
 %%% gen_statem callbacks
 %%%===================================================================
 
-init({local_connect, Ref, Host, N, PeerID, IP, Port, Owner}) ->
+init({local_connect, Ref, Host, N, PeerID, IP, Port, ConnectFun}) ->
     %%
     %% The client application wants to connect to a remote peer.
     %%
@@ -166,6 +166,7 @@ init({local_connect, Ref, Host, N, PeerID, IP, Port, Owner}) ->
     gproc_pool:connect_worker(Host, {IP, Port, Ref}),
     gproc:reg({p, l, worker_name}, {IP, Port, Ref}),
     gproc:reg({p, l, peer_id}, PeerID),
+    Owner = ConnectFun(IP, Port),
     Channels = start_channels(N, Owner),
     S = #state{
            owner = Owner,
@@ -177,7 +178,7 @@ init({local_connect, Ref, Host, N, PeerID, IP, Port, Owner}) ->
           },
     {ok, connecting, S};
 
-init({remote_connect, Ref, Host, PeerID, IP, Port, Owner}) ->
+init({remote_connect, Ref, Host, PeerID, IP, Port, ConnectFun}) ->
     %%
     %% A remote peer wants to connect to the client application.
     %%
@@ -187,6 +188,7 @@ init({remote_connect, Ref, Host, PeerID, IP, Port, Owner}) ->
     gproc_pool:connect_worker(Host, {IP, Port, Ref}),
     gproc:reg({p, l, worker_name}, {IP, Port, Ref}),
     gproc:reg({p, l, peer_id}, PeerID),
+    Owner = ConnectFun(IP, Port),
     S = #state{
            owner = Owner,
            host = Host,

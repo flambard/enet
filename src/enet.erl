@@ -1,7 +1,7 @@
 -module(enet).
 
 -export([
-         start_host/2,
+         start_host/3,
          stop_host/1,
          connect_peer/4,
          sync_connect_peer/4,
@@ -16,11 +16,13 @@
 -type port_number() :: 0..65535.
 
 
--spec start_host(Port :: port_number(), Options :: [{atom(), term()}]) ->
+-spec start_host(Port :: port_number(),
+                 ConnectFun :: fun((string(), port_number()) -> pid()),
+                 Options :: [{atom(), term()}]) ->
                         {ok, pid()} | {error, atom()}.
 
-start_host(Port, Options) ->
-    case enet_sup:start_host_supervisor(self(), Port, Options) of
+start_host(Port, ConnectFun, Options) ->
+    case enet_sup:start_host_supervisor(Port, ConnectFun, Options) of
         {error, Reason} -> {error, Reason};
         {ok, _HostSup} ->
             Host = gproc:where({n, l, {enet_host, Port}}),

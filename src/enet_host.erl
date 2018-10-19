@@ -33,11 +33,10 @@
 
 -record(state,
         {
-          owner,
-          socket,
-          compress_fun,
-          decompress_fun,
-          connect_fun
+         socket,
+         compress_fun,
+         decompress_fun,
+         connect_fun
         }).
 
 -define(NULL_PEER_ID, ?MAX_PEER_ID).
@@ -47,8 +46,8 @@
 %%% API
 %%%===================================================================
 
-start_link(Owner, Port, Options) ->
-    gen_server:start_link(?MODULE, {Owner, Port, Options}, []).
+start_link(Port, ConnectFun, Options) ->
+    gen_server:start_link(?MODULE, {Port, ConnectFun, Options}, []).
 
 connect(Host, IP, Port, ChannelCount) ->
     gen_server:call(Host, {connect, IP, Port, ChannelCount}).
@@ -97,7 +96,7 @@ get_channel_limit(Host) ->
 %%% gen_server callbacks
 %%%===================================================================
 
-init({Owner, Port, Options}) ->
+init({Port, ConnectFun, Options}) ->
     true = gproc:reg({n, l, {enet_host, Port}}),
     PeerLimit =
         case lists:keyfind(peer_limit, 1, Options) of
@@ -133,13 +132,8 @@ init({Owner, Port, Options}) ->
                      {reuseaddr, true}
                     ],
     gproc_pool:new(self(), direct, [{size, PeerLimit}, {auto_size, false}]),
-    ConnectFun =
-        case lists:keyfind(connect_fun, 1, Options) of
-            {connect_fun, OConnectFun} -> OConnectFun
-        end,
     {ok, Socket} = gen_udp:open(Port, SocketOptions),
     {ok, #state{
-            owner = Owner,
             socket = Socket,
             connect_fun = ConnectFun
            }}.
@@ -158,9 +152,8 @@ handle_call({connect, IP, Port, Channels}, _From, S) ->
     Ref = make_ref(),
     Reply =
         try gproc_pool:add_worker(self(), {IP, Port, Ref}) of
-            PeerID -> 
-                Owner = ConnectFun(IP, Port),
-                start_peer_local(Channels, PeerID, IP, Port, Ref, Owner)
+            PeerID ->
+                start_peer_local(Channels, PeerID, IP, Port, Ref, ConnectFun)
         catch
             error:pool_full -> {error, reached_peer_limit};
             error:exists    -> {error, exists}
@@ -237,7 +230,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
     #state{
        socket = Socket,
        decompress_fun = Decompress,
-       owner = Owner
+       connect_fun = ConnectFun
       } = S,
     %% TODO: Replace call to enet_protocol_decode with binary pattern match.
     {ok,
@@ -259,7 +252,8 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
             Ref = make_ref(),
             try gproc_pool:add_worker(self(), {IP, Port, Ref}) of
                 PeerID ->
-                    {ok, Pid} = start_peer_remote(PeerID, IP, Port, Ref, Owner),
+                    {ok, Pid} =
+                        start_peer_remote(PeerID, IP, Port, Ref, ConnectFun),
                     ok = enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
             catch
                 error:pool_full -> {error, reached_peer_limit};
@@ -327,22 +321,24 @@ code_change(_OldVsn, State, _Extra) ->
 get_time() ->
     erlang:system_time(1000) band 16#FFFF.
 
-start_peer_local(N, PeerID, IP, RPort, Ref, Owner) ->
-    LocalPort = gproc:get_value({p, l, port}, self()),
-    PeerSup = gproc:where({n, l, {enet_peer_sup, LocalPort}}),
+start_peer_local(N, PeerID, IP, RPort, Ref, ConnectFun) ->
+    PeerSup = locate_peer_supervisor(),
     {ok, Pid} =
         enet_peer_sup:start_peer_local(
-          PeerSup, Ref, self(), N, PeerID, IP, RPort, Owner),
+          PeerSup, Ref, self(), N, PeerID, IP, RPort, ConnectFun),
     true = gproc:reg_other({n, l, {worker, {IP, RPort, Ref}}}, Pid),
     _Ref = gproc:monitor({n, l, {worker, {IP, RPort, Ref}}}),
     {ok, Pid}.
 
-start_peer_remote(PeerID, IP, RPort, Ref, Owner) ->
-    LocalPort = gproc:get_value({p, l, port}, self()),
-    PeerSup = gproc:where({n, l, {enet_peer_sup, LocalPort}}),
+start_peer_remote(PeerID, IP, RPort, Ref, ConnectFun) ->
+    PeerSup = locate_peer_supervisor(),
     {ok, Pid} =
         enet_peer_sup:start_peer_remote(
-          PeerSup, Ref, self(), PeerID, IP, RPort, Owner),
+          PeerSup, Ref, self(), PeerID, IP, RPort, ConnectFun),
     true = gproc:reg_other({n, l, {worker, {IP, RPort, Ref}}}, Pid),
     _Ref = gproc:monitor({n, l, {worker, {IP, RPort, Ref}}}),
     {ok, Pid}.
+
+locate_peer_supervisor() ->
+    LocalPort = gproc:get_value({p, l, port}, self()),
+    gproc:where({n, l, {enet_peer_sup, LocalPort}}).

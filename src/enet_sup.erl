@@ -21,10 +21,10 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
-start_host_supervisor(Owner, ID, Options) ->
+start_host_supervisor(Port, ConnectFun, Options) ->
     Child = #{
-      id => ID,
-      start => {enet_host_sup, start_link, [Owner, ID, Options]},
+      id => Port,
+      start => {enet_host_sup, start_link, [Port, ConnectFun, Options]},
       restart => temporary,
       shutdown => infinity,
       type => supervisor,
