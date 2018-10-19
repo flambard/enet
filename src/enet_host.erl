@@ -7,7 +7,6 @@
 
 %% API
 -export([
-         start_link/2,
          start_link/3,
          connect/4,
          sync_connect/4,
@@ -37,7 +36,8 @@
           owner,
           socket,
           compress_fun,
-          decompress_fun
+          decompress_fun,
+          connect_fun
         }).
 
 -define(NULL_PEER_ID, ?MAX_PEER_ID).
@@ -47,17 +47,14 @@
 %%% API
 %%%===================================================================
 
-start_link(Owner, Port) ->
-    start_link(Owner, Port, []).
-
 start_link(Owner, Port, Options) ->
     gen_server:start_link(?MODULE, {Owner, Port, Options}, []).
 
 connect(Host, IP, Port, ChannelCount) ->
-    gen_server:call(Host, {connect, IP, Port, ChannelCount, self()}).
+    gen_server:call(Host, {connect, IP, Port, ChannelCount}).
 
 sync_connect(Host, IP, Port, ChannelCount) ->
-    case gen_server:call(Host, {connect, IP, Port, ChannelCount, self()}) of
+    case gen_server:call(Host, {connect, IP, Port, ChannelCount}) of
         {error, Reason} -> {error, Reason};
         {ok, Peer} ->
             receive
@@ -136,24 +133,34 @@ init({Owner, Port, Options}) ->
                      {reuseaddr, true}
                     ],
     gproc_pool:new(self(), direct, [{size, PeerLimit}, {auto_size, false}]),
+    ConnectFun =
+        case lists:keyfind(connect_fun, 1, Options) of
+            {connect_fun, OConnectFun} -> OConnectFun
+        end,
     {ok, Socket} = gen_udp:open(Port, SocketOptions),
     {ok, #state{
             owner = Owner,
-            socket = Socket
+            socket = Socket,
+            connect_fun = ConnectFun
            }}.
 
 
-handle_call({connect, IP, Port, Channels, Owner}, _From, S) ->
+handle_call({connect, IP, Port, Channels}, _From, S) ->
     %%
     %% Connect to a remote peer.
     %%
     %% - Add a worker to the pool
     %% - Start the peer process
     %%
+    #state{
+       connect_fun = ConnectFun
+      } = S,
     Ref = make_ref(),
     Reply =
         try gproc_pool:add_worker(self(), {IP, Port, Ref}) of
-            PeerID -> start_peer_local(Channels, PeerID, IP, Port, Ref, Owner)
+            PeerID -> 
+                Owner = ConnectFun(IP, Port),
+                start_peer_local(Channels, PeerID, IP, Port, Ref, Owner)
         catch
             error:pool_full -> {error, reached_peer_limit};
             error:exists    -> {error, exists}
