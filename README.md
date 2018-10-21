@@ -52,18 +52,6 @@ connect_peer(Host, IP, Port, ChannelCount) -> {ok, Peer} | {error, atom()}
 Start a new peer on `Host` connecting to a remote host on address `IP:Port`. The peer process will call `ConnectFun` (given to start_host/3) when initiating the handshake. If a successful connect handshake has been completed, the pid returned by `ConnectFun` will receive a message `{enet, connect, local, {Host, Channels}, ConnectID}`.
 
 ```erlang
-sync_connect_peer(Host, IP, Port, ChannelCount) -> {ok, {Peer, Channels}} | {error, atom()}
-
-    Host = pid()
-    IP = string()
-    Port = port_number()
-    ChannelCount = channel_count()
-    Peer = pid()
-    Channels = channels()
-```
-Equivalent to `connect_peer/4` but synchronous. The function returns when the handshake is completed or after a timeout.
-
-```erlang
 disconnect_peer(Peer) -> ok
 
     Peer = pid()
