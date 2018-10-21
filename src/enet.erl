@@ -4,7 +4,6 @@
          start_host/3,
          stop_host/1,
          connect_peer/4,
-         sync_connect_peer/4,
          disconnect_peer/1,
          disconnect_peer_now/1,
          send_unsequenced/2,
@@ -42,15 +41,6 @@ stop_host(Port) ->
 
 connect_peer(Host, IP, Port, ChannelCount) ->
     enet_host:connect(Host, IP, Port, ChannelCount).
-
-
--spec sync_connect_peer(Host :: pid(), IP :: string(), Port :: port_number(),
-                        ChannelCount :: pos_integer()) ->
-                               {ok, {Peer :: pid(), Channels :: map()}} |
-                               {error, atom()}.
-
-sync_connect_peer(Host, IP, Port, ChannelCount) ->
-    enet_host:sync_connect(Host, IP, Port, ChannelCount).
 
 
 -spec disconnect_peer(Peer :: pid()) -> ok.

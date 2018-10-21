@@ -9,7 +9,6 @@
 -export([
          start_link/3,
          connect/4,
-         sync_connect/4,
          send_outgoing_commands/4,
          send_outgoing_commands/5,
          set_disconnect_trigger/4,
@@ -51,18 +50,6 @@ start_link(Port, ConnectFun, Options) ->
 
 connect(Host, IP, Port, ChannelCount) ->
     gen_server:call(Host, {connect, IP, Port, ChannelCount}).
-
-sync_connect(Host, IP, Port, ChannelCount) ->
-    case gen_server:call(Host, {connect, IP, Port, ChannelCount}) of
-        {error, Reason} -> {error, Reason};
-        {ok, Peer} ->
-            receive
-                {enet, connect, local, {Peer, Channels}, _ConnectID} ->
-                    {ok, {Peer, Channels}}
-            after 1000 ->
-                    {error, timeout}
-            end
-    end.
 
 send_outgoing_commands(Host, Commands, IP, Port) ->
     send_outgoing_commands(Host, Commands, IP, Port, ?NULL_PEER_ID).

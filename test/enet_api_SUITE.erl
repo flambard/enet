@@ -34,8 +34,8 @@ all() ->
     [
      local_zero_peer_limit_test,
      remote_zero_peer_limit_test,
-     async_connect_and_local_disconnect_test,
-     sync_connect_and_remote_disconnect_test,
+     local_disconnect_test,
+     remote_disconnect_test,
      unsequenced_messages_test,
      unreliable_messages_test,
      reliable_messages_test
@@ -69,7 +69,7 @@ remote_zero_peer_limit_test(_Config) ->
     ok = enet:stop_host(5001),
     ok = enet:stop_host(5002).
 
-async_connect_and_local_disconnect_test(_Config) ->
+local_disconnect_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
     {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
@@ -114,16 +114,21 @@ async_connect_and_local_disconnect_test(_Config) ->
     ok = enet:stop_host(5002),
     ok.
 
-sync_connect_and_remote_disconnect_test(_Config) ->
+remote_disconnect_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
     {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
-    {ok, {LocalPeer, _LocalChannels}} =
-        enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
-    {RemotePeer, ConnectID} =
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    ConnectID =
         receive
-            {enet, connect, remote, {P, _RemoteChannels}, C} -> {P, C}
+            {enet, connect, local, {LocalPeer, _LocalChannels}, C} -> C
+        after 1000 ->
+                exit(local_peer_did_not_notify_owner)
+        end,
+    RemotePeer =
+        receive
+            {enet, connect, remote, {P, _RemoteChannels}, ConnectID} -> P
         after 1000 ->
                 exit(remote_peer_did_not_notify_owner)
         end,
@@ -159,11 +164,16 @@ unsequenced_messages_test(_Config) ->
     ConnectFun = fun(_IP, _Port) -> Self end,
     {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
-    {ok, {_LocalPeer, LocalChannels}} =
-        enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ConnectID, LocalChannels} =
+        receive
+            {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
+        after 1000 ->
+                exit(local_peer_did_not_notify_owner)
+        end,
     {_RemotePeer, RemoteChannels} =
         receive
-            {enet, connect, remote, PC, _} -> PC
+            {enet, connect, remote, PC, ConnectID} -> PC
         after 1000 ->
                 exit(remote_peer_did_not_notify_owner)
         end,
@@ -190,11 +200,16 @@ unreliable_messages_test(_Config) ->
     ConnectFun = fun(_IP, _Port) -> Self end,
     {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
-    {ok, {_LocalPeer, LocalChannels}} =
-        enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ConnectID, LocalChannels} =
+        receive
+            {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
+        after 1000 ->
+                exit(local_peer_did_not_notify_owner)
+        end,
     {_RemotePeer, RemoteChannels} =
         receive
-            {enet, connect, remote, PC, _} -> PC
+            {enet, connect, remote, PC, ConnectID} -> PC
         after 1000 ->
                 exit(remote_peer_did_not_notify_owner)
         end,
@@ -233,11 +248,16 @@ reliable_messages_test(_Config) ->
     ConnectFun = fun(_IP, _Port) -> Self end,
     {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
     {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
-    {ok, {_LocalPeer, LocalChannels}} =
-        enet:sync_connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ConnectID, LocalChannels} =
+        receive
+            {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
+        after 1000 ->
+                exit(local_peer_did_not_notify_owner)
+        end,
     {_RemotePeer, RemoteChannels} =
         receive
-            {enet, connect, remote, PC, _} -> PC
+            {enet, connect, remote, PC, ConnectID} -> PC
         after 1000 ->
                 exit(remote_peer_did_not_notify_owner)
         end,
