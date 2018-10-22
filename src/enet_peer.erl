@@ -167,6 +167,7 @@ init({local_connect, Ref, Host, N, PeerID, IP, Port, ConnectFun}) ->
     gproc:reg({p, l, worker_name}, {IP, Port, Ref}),
     gproc:reg({p, l, peer_id}, PeerID),
     Owner = ConnectFun(IP, Port),
+    _Ref = monitor(process, Owner),
     Channels = start_channels(N, Owner),
     S = #state{
            owner = Owner,
@@ -189,6 +190,7 @@ init({remote_connect, Ref, Host, PeerID, IP, Port, ConnectFun}) ->
     gproc:reg({p, l, worker_name}, {IP, Port, Ref}),
     gproc:reg({p, l, peer_id}, PeerID),
     Owner = ConnectFun(IP, Port),
+    _Ref = monitor(process, Owner),
     S = #state{
            owner = Owner,
            host = Host,
@@ -874,7 +876,10 @@ handle_event(cast, {incoming_packet, SentTime, Packet}, S) ->
     {keep_state, S};
 
 handle_event({call, From}, channels, S) ->
-    {keep_state, S, [{reply, From, S#state.channels}]}.
+    {keep_state, S, [{reply, From, S#state.channels}]};
+
+handle_event(info, {'DOWN', _, process, O, _Reason}, S = #state{ owner = O }) ->
+    {stop, owner_process_down, S}.
 
 
 start_channels(N, Owner) ->
