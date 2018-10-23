@@ -84,6 +84,7 @@ get_channel_limit(Host) ->
 %%%===================================================================
 
 init({Port, ConnectFun, Options}) ->
+    process_flag(trap_exit, true),
     true = gproc:reg({n, l, {enet_host, Port}}),
     PeerLimit =
         case lists:keyfind(peer_limit, 1, Options) of
