@@ -162,13 +162,10 @@ write_debug(Dev, Event, Name) ->
     io:format(Dev, "~p event = ~p~n", [Name, Event]).
 
 system_continue(_Parent, _Debug, State) ->
-    io:format("Continue!~n"),
     loop(State).
 
 system_terminate(Reason, _Parent, _Debug, _State) ->
-    io:format("Terminate!~n"),
     exit(Reason).
 
 system_code_change(State, _Module, _OldVsn, _Extra) ->
-    io:format("Changed code!~n"),
     {ok, State}.
