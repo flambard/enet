@@ -25,8 +25,8 @@ start_link(Port, ConnectFun, Options) ->
 init([Port, ConnectFun, Options]) ->
     SupFlags = #{
       strategy => one_for_all,
-      intensity => 0, %% <- Zero tolerance for crashes
-      period => 1
+      intensity => 1,
+      period => 5
      },
     Host = #{
              id => host,
