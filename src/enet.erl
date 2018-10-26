@@ -4,6 +4,7 @@
          start_host/3,
          stop_host/1,
          connect_peer/4,
+         await_connect/0,
          disconnect_peer/1,
          disconnect_peer_now/1,
          send_unsequenced/2,
@@ -41,6 +42,13 @@ stop_host(Port) ->
 
 connect_peer(Host, IP, Port, ChannelCount) ->
     enet_host:connect(Host, IP, Port, ChannelCount).
+
+
+await_connect() ->
+    receive
+        C = {enet, connect, LocalOrRemote, PC, ConnectID} -> {ok, C}
+    after 1000 -> {error, timeout}
+    end.
 
 
 -spec disconnect_peer(Peer :: pid()) -> ok.

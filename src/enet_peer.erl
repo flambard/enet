@@ -163,7 +163,8 @@ init({local_connect, Ref, Host, N, PeerID, IP, Port, ConnectFun}) ->
     %% - Send a Connect command to the remote peer (use peer ID)
     %% - Start in the 'connecting' state
     %%
-    gproc_pool:connect_worker(Host, {IP, Port, Ref}),
+    LocalPort = enet_host:get_port(Host),
+    enet_pool:connect_worker(LocalPort, {IP, Port, Ref}),
     gproc:reg({p, l, worker_name}, {IP, Port, Ref}),
     gproc:reg({p, l, peer_id}, PeerID),
     Owner = ConnectFun(IP, Port),
@@ -186,7 +187,8 @@ init({remote_connect, Ref, Host, PeerID, IP, Port, ConnectFun}) ->
     %% - Start in the 'acknowledging_connect' state
     %% - Handle the received Connect command
     %%
-    gproc_pool:connect_worker(Host, {IP, Port, Ref}),
+    LocalPort = enet_host:get_port(Host),
+    enet_pool:connect_worker(LocalPort, {IP, Port, Ref}),
     gproc:reg({p, l, worker_name}, {IP, Port, Ref}),
     gproc:reg({p, l, peer_id}, PeerID),
     Owner = ConnectFun(IP, Port),
@@ -820,7 +822,8 @@ disconnecting(EventType, EventContent, S) ->
 
 terminate(_Reason, _StateName, #state{ host = Host }) ->
     Name = get_worker_name(self()),
-    gproc_pool:disconnect_worker(Host, Name),
+    LocalPort = enet_host:get_port(Host),
+    enet_pool:disconnect_worker(LocalPort, Name),
     ok.
 
 

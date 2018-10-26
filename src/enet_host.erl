@@ -84,13 +84,7 @@ get_channel_limit(Host) ->
 %%%===================================================================
 
 init({Port, ConnectFun, Options}) ->
-    process_flag(trap_exit, true),
     true = gproc:reg({n, l, {enet_host, Port}}),
-    PeerLimit =
-        case lists:keyfind(peer_limit, 1, Options) of
-            {peer_limit, PLimit} -> PLimit;
-            false                -> 1
-        end,
     ChannelLimit =
         case lists:keyfind(channel_limit, 1, Options) of
             {channel_limit, CLimit} -> CLimit;
@@ -119,7 +113,6 @@ init({Port, ConnectFun, Options}) ->
                      {active, true},
                      {reuseaddr, true}
                     ],
-    gproc_pool:new(self(), direct, [{size, PeerLimit}, {auto_size, false}]),
     {ok, Socket} = gen_udp:open(Port, SocketOptions),
     {ok, #state{
             socket = Socket,
@@ -138,8 +131,9 @@ handle_call({connect, IP, Port, Channels}, _From, S) ->
        connect_fun = ConnectFun
       } = S,
     Ref = make_ref(),
+    LocalPort = get_port(self()),
     Reply =
-        try gproc_pool:add_worker(self(), {IP, Port, Ref}) of
+        try enet_pool:add_worker(LocalPort, {IP, Port, Ref}) of
             PeerID ->
                 start_peer_local(Channels, PeerID, IP, Port, Ref, ConnectFun)
         catch
@@ -233,12 +227,13 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
             0 -> Rest;
             1 -> Decompress(Rest)
         end,
+    LocalPort = get_port(self()),
     case RecipientPeerID of
         ?NULL_PEER_ID ->
             %% No particular peer is the receiver of this packet.
             %% Create a new peer.
             Ref = make_ref(),
-            try gproc_pool:add_worker(self(), {IP, Port, Ref}) of
+            try enet_pool:add_worker(LocalPort, {IP, Port, Ref}) of
                 PeerID ->
                     {ok, Pid} =
                         start_peer_remote(PeerID, IP, Port, Ref, ConnectFun),
@@ -248,7 +243,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                 error:exists    -> {error, exists}
             end;
         PeerID ->
-            case gproc_pool:pick_worker(self(), PeerID) of
+            case enet_pool:pick_worker(LocalPort, PeerID) of
                 false -> ok; %% Unknown peer - drop the packet
                 Pid   -> enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
             end
@@ -281,7 +276,8 @@ handle_info({gproc, unreg, _Ref, {n, l, {worker, {IP, Port, Ref}}}}, S) ->
     %%
     %% - Remove the worker from the pool
     %%
-    true = gproc_pool:remove_worker(self(), {IP, Port, Ref}),
+    LocalPort = get_port(self()),
+    true = enet_pool:remove_worker(LocalPort, {IP, Port, Ref}),
     {noreply, S}.
 
 
@@ -290,7 +286,6 @@ handle_info({gproc, unreg, _Ref, {n, l, {worker, {IP, Port, Ref}}}}, S) ->
 %%%
 
 terminate(_Reason, S) ->
-    gproc_pool:force_delete(self()),
     ok = gen_udp:close(S#state.socket).
 
 

@@ -24,12 +24,29 @@ start_link(Port, ConnectFun, Options) ->
 
 init([Port, ConnectFun, Options]) ->
     SupFlags = #{
-      strategy => one_for_all,
+      strategy => one_for_one,
       intensity => 1,
       period => 5
      },
+    PeerLimit =
+        case lists:keyfind(peer_limit, 1, Options) of
+            {peer_limit, PLimit} -> PLimit;
+            false                -> 1
+        end,
+    Pool = #{
+             id => enet_pool,
+             start => {
+                       enet_pool,
+                       start_link,
+                       [Port, PeerLimit]
+                      },
+             restart => permanent,
+             shutdown => 2000,
+             type => worker,
+             modules => [enet_pool]
+            },
     Host = #{
-             id => host,
+             id => enet_host,
              start => {
                        enet_host,
                        start_link,
@@ -52,7 +69,7 @@ init([Port, ConnectFun, Options]) ->
                 type => supervisor,
                 modules => [enet_peer_sup]
                },
-    {ok, {SupFlags, [Host, PeerSup]}}.
+    {ok, {SupFlags, [Pool, Host, PeerSup]}}.
 
 
 %%%===================================================================
