@@ -483,7 +483,9 @@ connected(enter, _OldState, S) ->
                              {remote_peer_id, RemotePeerID}
                             ]),
     ok = enet_host:set_disconnect_trigger(Host, RemotePeerID, IP, Port),
-    {keep_state, S};
+    SendTimeout = reset_send_timer(),
+    RecvTimeout = reset_recv_timer(),
+    {keep_state, S, [SendTimeout, RecvTimeout]};
 
 connected(cast, {incoming_command, {_H, #ping{}}}, S) ->
     %%
