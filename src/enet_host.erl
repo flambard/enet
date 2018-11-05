@@ -133,7 +133,7 @@ handle_call({connect, IP, Port, Channels}, _From, S) ->
     Ref = make_ref(),
     LocalPort = get_port(self()),
     Reply =
-        try enet_pool:add_worker(LocalPort, {IP, Port, Ref}) of
+        try enet_pool:add_worker(LocalPort, Ref) of
             PeerID ->
                 start_peer_local(Channels, PeerID, IP, Port, Ref, ConnectFun)
         catch
@@ -233,7 +233,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
             %% No particular peer is the receiver of this packet.
             %% Create a new peer.
             Ref = make_ref(),
-            try enet_pool:add_worker(LocalPort, {IP, Port, Ref}) of
+            try enet_pool:add_worker(LocalPort, Ref) of
                 PeerID ->
                     {ok, Pid} =
                         start_peer_remote(PeerID, IP, Port, Ref, ConnectFun),
@@ -270,14 +270,14 @@ handle_info({gproc, unreg, _Ref, {n, l, {PeerID, IP, Port}}}, S) ->
     ok = gen_udp:send(Socket, IP, Port, Packet),
     {noreply, S};
 
-handle_info({gproc, unreg, _Ref, {n, l, {worker, {IP, Port, Ref}}}}, S) ->
+handle_info({gproc, unreg, _Ref, {n, l, {worker, Ref}}}, S) ->
     %%
     %% A Peer process has exited.
     %%
     %% - Remove the worker from the pool
     %%
     LocalPort = get_port(self()),
-    true = enet_pool:remove_worker(LocalPort, {IP, Port, Ref}),
+    true = enet_pool:remove_worker(LocalPort, Ref),
     {noreply, S}.
 
 
@@ -309,8 +309,8 @@ start_peer_local(N, PeerID, IP, RPort, Ref, ConnectFun) ->
     {ok, Pid} =
         enet_peer_sup:start_peer_local(
           PeerSup, Ref, self(), N, PeerID, IP, RPort, ConnectFun),
-    true = gproc:reg_other({n, l, {worker, {IP, RPort, Ref}}}, Pid),
-    _Ref = gproc:monitor({n, l, {worker, {IP, RPort, Ref}}}),
+    true = gproc:reg_other({n, l, {worker, Ref}}, Pid),
+    _Ref = gproc:monitor({n, l, {worker, Ref}}),
     {ok, Pid}.
 
 start_peer_remote(PeerID, IP, RPort, Ref, ConnectFun) ->
@@ -318,8 +318,8 @@ start_peer_remote(PeerID, IP, RPort, Ref, ConnectFun) ->
     {ok, Pid} =
         enet_peer_sup:start_peer_remote(
           PeerSup, Ref, self(), PeerID, IP, RPort, ConnectFun),
-    true = gproc:reg_other({n, l, {worker, {IP, RPort, Ref}}}, Pid),
-    _Ref = gproc:monitor({n, l, {worker, {IP, RPort, Ref}}}),
+    true = gproc:reg_other({n, l, {worker, Ref}}, Pid),
+    _Ref = gproc:monitor({n, l, {worker, Ref}}),
     {ok, Pid}.
 
 locate_peer_supervisor() ->

@@ -164,8 +164,8 @@ init({local_connect, Ref, Host, N, PeerID, IP, Port, ConnectFun}) ->
     %% - Start in the 'connecting' state
     %%
     LocalPort = enet_host:get_port(Host),
-    enet_pool:connect_worker(LocalPort, {IP, Port, Ref}),
-    gproc:reg({p, l, worker_name}, {IP, Port, Ref}),
+    enet_pool:connect_worker(LocalPort, Ref),
+    gproc:reg({p, l, worker_name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
     Owner = ConnectFun(IP, Port),
     _Ref = monitor(process, Owner),
@@ -188,8 +188,8 @@ init({remote_connect, Ref, Host, PeerID, IP, Port, ConnectFun}) ->
     %% - Handle the received Connect command
     %%
     LocalPort = enet_host:get_port(Host),
-    enet_pool:connect_worker(LocalPort, {IP, Port, Ref}),
-    gproc:reg({p, l, worker_name}, {IP, Port, Ref}),
+    enet_pool:connect_worker(LocalPort, Ref),
+    gproc:reg({p, l, worker_name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
     Owner = ConnectFun(IP, Port),
     _Ref = monitor(process, Owner),
