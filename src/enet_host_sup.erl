@@ -57,6 +57,18 @@ init([Port, ConnectFun, Options]) ->
              type => worker,
              modules => [enet_host]
             },
+    Disconnector = #{
+                     id => enet_disconnector,
+                     start => {
+                               enet_disconnector,
+                               start_link,
+                               [Port]
+                              },
+                     restart => permanent,
+                     shutdown => 1000,
+                     type => worker,
+                     modules => [enet_disconnector]
+                    },
     PeerSup = #{
                 id => enet_peer_sup,
                 start => {
@@ -69,7 +81,7 @@ init([Port, ConnectFun, Options]) ->
                 type => supervisor,
                 modules => [enet_peer_sup]
                },
-    {ok, {SupFlags, [Pool, Host, PeerSup]}}.
+    {ok, {SupFlags, [Pool, Host, Disconnector, PeerSup]}}.
 
 
 %%%===================================================================

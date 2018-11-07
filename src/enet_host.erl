@@ -11,8 +11,6 @@
          connect/4,
          send_outgoing_commands/4,
          send_outgoing_commands/5,
-         set_disconnect_trigger/4,
-         unset_disconnect_trigger/4,
          get_port/1,
          get_incoming_bandwidth/1,
          get_outgoing_bandwidth/1,
@@ -56,12 +54,6 @@ send_outgoing_commands(Host, Commands, IP, Port) ->
 
 send_outgoing_commands(Host, Commands, IP, Port, PeerID) ->
     gen_server:call(Host, {send_outgoing_commands, Commands, IP, Port, PeerID}).
-
-set_disconnect_trigger(Host, PeerID, IP, Port) ->
-    gen_server:cast(Host, {set_disconnect_trigger, self(), PeerID, IP, Port}).
-
-unset_disconnect_trigger(Host, PeerID, IP, Port) ->
-    gen_server:call(Host, {unset_disconnect_trigger, PeerID, IP, Port}).
 
 get_port(Host) ->
     gproc:get_value({p, l, port}, Host).
@@ -158,40 +150,12 @@ handle_call({send_outgoing_commands, Commands, IP, Port, ID}, _From, S) ->
            },
     Packet = [enet_protocol_encode:protocol_header(PH), Commands],
     ok = gen_udp:send(S#state.socket, IP, Port, Packet),
-    {reply, {sent_time, SentTime}, S};
-
-handle_call({unset_disconnect_trigger, PeerID, IP, Port}, {PeerPid, _}, S) ->
-    %%
-    %% A Peer wants to unset its disconnect trigger.
-    %%
-    %% - Demonitor the peer
-    %% - Unregister the peer
-    %% - Return 'ok'
-    %%
-    Key = {n, l, {PeerID, IP, Port}},
-    Ref = gproc:get_value(Key, PeerPid),
-    ok = gproc:demonitor(Key, Ref),
-    true = gproc:unreg_other(Key, PeerPid),
-    {reply, ok, S}.
+    {reply, {sent_time, SentTime}, S}.
 
 
 %%%
 %%% handle_cast
 %%%
-
-handle_cast({set_disconnect_trigger, PeerPid, PeerID, IP, Port}, State) ->
-    %%
-    %% A Peer wants to set its disconnect trigger.
-    %%
-    %% - Register the peer ID, IP, and port
-    %% - Monitor the peer
-    %% - Store the monitor reference
-    %%
-    Key = {n, l, {PeerID, IP, Port}},
-    true = gproc:reg_other(Key, PeerPid),
-    Ref = gproc:monitor(Key),
-    updated = gproc:ensure_reg_other(Key, PeerPid, Ref),
-    {noreply, State};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -248,26 +212,6 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                 Pid   -> enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
             end
     end,
-    {noreply, S};
-
-handle_info({gproc, unreg, _Ref, {n, l, {PeerID, IP, Port}}}, S) ->
-    %%
-    %% A Peer has exited abnormally.
-    %%
-    %% - Send an unsequenced Disconnect message
-    %%
-    #state{ socket = Socket } = S,
-    PH = #protocol_header{
-            peer_id = PeerID,
-            sent_time = get_time()
-           },
-    {CH, Command} = enet_command:unsequenced_disconnect(),
-    Packet = [
-              enet_protocol_encode:protocol_header(PH),
-              enet_protocol_encode:command_header(CH),
-              enet_protocol_encode:command(Command)
-             ],
-    ok = gen_udp:send(Socket, IP, Port, Packet),
     {noreply, S};
 
 handle_info({gproc, unreg, _Ref, {n, l, {worker, Ref}}}, S) ->

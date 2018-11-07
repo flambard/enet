@@ -484,7 +484,8 @@ connected(enter, _OldState, S) ->
                              {remote_host_port, Port},
                              {remote_peer_id, RemotePeerID}
                             ]),
-    ok = enet_host:set_disconnect_trigger(Host, RemotePeerID, IP, Port),
+    LocalPort = enet_host:get_port(Host),
+    ok = enet_disconnector:set_trigger(LocalPort, RemotePeerID, IP, Port),
     SendTimeout = reset_send_timer(),
     RecvTimeout = reset_recv_timer(),
     {keep_state, S, [SendTimeout, RecvTimeout]};
@@ -616,7 +617,8 @@ connected(cast, {incoming_command, {_H, #disconnect{}}}, S) ->
        remote_peer_id = RemotePeerID,
        connect_id = ConnectID
       } = S,
-    ok = enet_host:unset_disconnect_trigger(Host, RemotePeerID, IP, Port),
+    LocalPort = enet_host:get_port(Host),
+    ok = enet_disconnector:unset_trigger(LocalPort, RemotePeerID, IP, Port),
     Owner ! {enet, disconnected, remote, self(), ConnectID},
     {stop, normal, S};
 
@@ -791,7 +793,8 @@ disconnecting(enter, _OldState, S) ->
        port = Port,
        remote_peer_id = RemotePeerID
       } = S,
-    ok = enet_host:unset_disconnect_trigger(Host, RemotePeerID, IP, Port),
+    LocalPort = enet_host:get_port(Host),
+    ok = enet_disconnector:unset_trigger(LocalPort, RemotePeerID, IP, Port),
     {keep_state, S};
 
 disconnecting(cast, {incoming_command, {_H, _C = #acknowledge{}}}, S) ->
