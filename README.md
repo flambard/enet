@@ -89,3 +89,30 @@ send_reliable(Channel, Data) -> ok
     Data = iolist()
 ```
 Send *reliable* data to the remote peer over `Channel`.
+
+```erlang
+broadcast_unsequenced(HostPort, ChannelID, Data) -> ok
+
+    HostPort = port_number()
+    ChannelID = integer()
+    Data = iolist()
+```
+Broadcast *unsequenced* data to all peers connected to `HostPort` on `ChannelID`.
+
+```erlang
+broadcast_unreliable(HostPort, ChannelID, Data) -> ok
+
+    HostPort = port_number()
+    ChannelID = integer()
+    Data = iolist()
+```
+Broadcast *unreliable* data to all peers connected to `HostPort` on `ChannelID`.
+
+```erlang
+broadcast_reliable(HostPort, ChannelID, Data) -> ok
+
+    HostPort = port_number()
+    ChannelID = integer()
+    Data = iolist()
+```
+Broadcast *reliable* data to all peers connected to `HostPort` on `ChannelID`.

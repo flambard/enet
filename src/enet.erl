@@ -9,7 +9,10 @@
          disconnect_peer_now/1,
          send_unsequenced/2,
          send_unreliable/2,
-         send_reliable/2
+         send_reliable/2,
+         broadcast_unsequenced/3,
+         broadcast_unreliable/3,
+         broadcast_reliable/3
         ]).
 
 -type port_number() :: 0..65535.
@@ -90,7 +93,38 @@ send_reliable(Channel, Data) ->
     enet_channel:send_reliable(Channel, Data).
 
 
+-spec broadcast_unsequenced(HostPort :: port_number(),
+                            ChannelID :: integer(),
+                            Data :: iolist()) -> ok.
+
+broadcast_unsequenced(HostPort, ChannelID, Data) ->
+    broadcast(HostPort, ChannelID, Data, fun send_unsequenced/2).
+
+
+-spec broadcast_unreliable(HostPort :: port_number(),
+                           ChannelID :: integer(),
+                           Data :: iolist()) -> ok.
+
+broadcast_unreliable(HostPort, ChannelID, Data) ->
+    broadcast(HostPort, ChannelID, Data, fun send_unreliable/2).
+
+
+-spec broadcast_reliable(HostPort :: port_number(),
+                         ChannelID :: integer(),
+                         Data :: iolist()) -> ok.
+
+broadcast_reliable(HostPort, ChannelID, Data) ->
+    broadcast(HostPort, ChannelID, Data, fun send_reliable/2).
+
+
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
 
+broadcast(HostPort, ChannelID, Data, SendFun) ->
+    Workers = enet_pool:active_workers(HostPort),
+    lists:foreach(fun ({_Name, Peer}) ->
+                          Channel = enet_peer:channel(Peer, ChannelID),
+                          SendFun(Channel, Data)
+                  end,
+                  Workers).

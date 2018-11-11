@@ -8,7 +8,8 @@
          pick_worker/2,
          remove_worker/2,
          connect_worker/2,
-         disconnect_worker/2
+         disconnect_worker/2,
+         active_workers/1
         ]).
 
 %% gen_server callbacks
@@ -47,6 +48,9 @@ connect_worker(Port, Name) ->
 
 disconnect_worker(Port, Name) ->
     gproc_pool:disconnect_worker(Port, Name).
+
+active_workers(Port) ->
+    gproc_pool:active_workers(Port).
 
 
 %%%===================================================================

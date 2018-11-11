@@ -11,6 +11,7 @@
          disconnect/1,
          disconnect_now/1,
          channels/1,
+         channel/2,
          recv_incoming_packet/3,
          send_command/2,
          get_connect_id/1,
@@ -132,6 +133,9 @@ disconnect_now(Peer) ->
 
 channels(Peer) ->
     gen_statem:call(Peer, channels).
+
+channel(Peer, ID) ->
+    gen_statem:call(Peer, {channel, ID}).
 
 recv_incoming_packet(Peer, SentTime, Packet) ->
     gen_statem:cast(Peer, {incoming_packet, SentTime, Packet}).
@@ -885,6 +889,10 @@ handle_event(cast, {incoming_packet, SentTime, Packet}, S) ->
 
 handle_event({call, From}, channels, S) ->
     {keep_state, S, [{reply, From, S#state.channels}]};
+
+handle_event({call, From}, {channel, ID}, S) ->
+    #state{ channels = #{ ID := Channel }} = S,
+    {keep_state, S, [{reply, From, Channel}]};
 
 handle_event(info, {'DOWN', _, process, O, _Reason}, S = #state{ owner = O }) ->
     {stop, owner_process_down, S}.

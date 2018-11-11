@@ -38,7 +38,10 @@ all() ->
      remote_disconnect_test,
      unsequenced_messages_test,
      unreliable_messages_test,
-     reliable_messages_test
+     reliable_messages_test,
+     unsequenced_broadcast_test,
+     unreliable_broadcast_test,
+     reliable_broadcast_test
     ].
 
 
@@ -285,3 +288,240 @@ reliable_messages_test(_Config) ->
     end,
     ok = enet:stop_host(LocalHost),
     ok = enet:stop_host(RemoteHost).
+
+unsequenced_broadcast_test(_Config) ->
+    Self = self(),
+    ConnectFun = fun(_IP, _Port) -> Self end,
+    {ok, Host1} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, Host2} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, Host3} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, Peer12} = enet:connect_peer(Host1, "127.0.0.1", Host2, 1),
+    ConnectID12 =
+        receive
+            {enet, connect, local, {Peer12, _Cs12}, CID12} -> CID12
+        after 1000 ->
+                exit(peer12_did_not_notify_owner)
+        end,
+    receive
+        {enet, connect, remote, {_P21, _Cs21}, ConnectID12} -> ok
+    after 1000 ->
+            exit(peer21_did_not_notify_owner)
+    end,
+    {ok, Peer23} = enet:connect_peer(Host2, "127.0.0.1", Host3, 1),
+    ConnectID23 =
+        receive
+            {enet, connect, local, {Peer23, _Cs23}, CID23} -> CID23
+        after 1000 ->
+                exit(peer23_did_not_notify_owner)
+        end,
+    receive
+        {enet, connect, remote, {_P32, _Cs32}, ConnectID23} -> ok
+    after 1000 ->
+            exit(peer32_did_not_notify_owner)
+    end,
+    {ok, Peer31} = enet:connect_peer(Host3, "127.0.0.1", Host1, 1),
+    ConnectID31 =
+        receive
+            {enet, connect, local, {Peer31, _Cs31}, CID31} -> CID31
+        after 1000 ->
+                exit(peer31_did_not_notify_owner)
+        end,
+    receive
+        {enet, connect, remote, {_P13, _Cs13}, ConnectID31} -> ok
+    after 1000 ->
+            exit(peer13_did_not_notify_owner)
+    end,
+    ok = enet:broadcast_unsequenced(Host1, 0, <<"host1->broadcast">>),
+    ok = enet:broadcast_unsequenced(Host2, 0, <<"host2->broadcast">>),
+    ok = enet:broadcast_unsequenced(Host3, 0, <<"host3->broadcast">>),
+    receive
+        {enet, 0, #unsequenced{ data = <<"host1->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #unsequenced{ data = <<"host1->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #unsequenced{ data = <<"host2->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #unsequenced{ data = <<"host2->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #unsequenced{ data = <<"host3->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #unsequenced{ data = <<"host3->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    ok = enet:stop_host(Host1),
+    ok = enet:stop_host(Host2),
+    ok = enet:stop_host(Host3).
+
+unreliable_broadcast_test(_Config) ->
+    Self = self(),
+    ConnectFun = fun(_IP, _Port) -> Self end,
+    {ok, Host1} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, Host2} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, Host3} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, Peer12} = enet:connect_peer(Host1, "127.0.0.1", Host2, 1),
+    ConnectID12 =
+        receive
+            {enet, connect, local, {Peer12, _Cs12}, CID12} -> CID12
+        after 1000 ->
+                exit(peer12_did_not_notify_owner)
+        end,
+    receive
+        {enet, connect, remote, {_P21, _Cs21}, ConnectID12} -> ok
+    after 1000 ->
+            exit(peer21_did_not_notify_owner)
+    end,
+    {ok, Peer23} = enet:connect_peer(Host2, "127.0.0.1", Host3, 1),
+    ConnectID23 =
+        receive
+            {enet, connect, local, {Peer23, _Cs23}, CID23} -> CID23
+        after 1000 ->
+                exit(peer23_did_not_notify_owner)
+        end,
+    receive
+        {enet, connect, remote, {_P32, _Cs32}, ConnectID23} -> ok
+    after 1000 ->
+            exit(peer32_did_not_notify_owner)
+    end,
+    {ok, Peer31} = enet:connect_peer(Host3, "127.0.0.1", Host1, 1),
+    ConnectID31 =
+        receive
+            {enet, connect, local, {Peer31, _Cs31}, CID31} -> CID31
+        after 1000 ->
+                exit(peer31_did_not_notify_owner)
+        end,
+    receive
+        {enet, connect, remote, {_P13, _Cs13}, ConnectID31} -> ok
+    after 1000 ->
+            exit(peer13_did_not_notify_owner)
+    end,
+    ok = enet:broadcast_unreliable(Host1, 0, <<"host1->broadcast">>),
+    ok = enet:broadcast_unreliable(Host2, 0, <<"host2->broadcast">>),
+    ok = enet:broadcast_unreliable(Host3, 0, <<"host3->broadcast">>),
+    receive
+        {enet, 0, #unreliable{ data = <<"host1->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #unreliable{ data = <<"host1->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #unreliable{ data = <<"host2->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #unreliable{ data = <<"host2->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #unreliable{ data = <<"host3->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #unreliable{ data = <<"host3->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    ok = enet:stop_host(Host1),
+    ok = enet:stop_host(Host2),
+    ok = enet:stop_host(Host3).
+
+reliable_broadcast_test(_Config) ->
+    Self = self(),
+    ConnectFun = fun(_IP, _Port) -> Self end,
+    {ok, Host1} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, Host2} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, Host3} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, Peer12} = enet:connect_peer(Host1, "127.0.0.1", Host2, 1),
+    ConnectID12 =
+        receive
+            {enet, connect, local, {Peer12, _Cs12}, CID12} -> CID12
+        after 1000 ->
+                exit(peer12_did_not_notify_owner)
+        end,
+    receive
+        {enet, connect, remote, {_P21, _Cs21}, ConnectID12} -> ok
+    after 1000 ->
+            exit(peer21_did_not_notify_owner)
+    end,
+    {ok, Peer23} = enet:connect_peer(Host2, "127.0.0.1", Host3, 1),
+    ConnectID23 =
+        receive
+            {enet, connect, local, {Peer23, _Cs23}, CID23} -> CID23
+        after 1000 ->
+                exit(peer23_did_not_notify_owner)
+        end,
+    receive
+        {enet, connect, remote, {_P32, _Cs32}, ConnectID23} -> ok
+    after 1000 ->
+            exit(peer32_did_not_notify_owner)
+    end,
+    {ok, Peer31} = enet:connect_peer(Host3, "127.0.0.1", Host1, 1),
+    ConnectID31 =
+        receive
+            {enet, connect, local, {Peer31, _Cs31}, CID31} -> CID31
+        after 1000 ->
+                exit(peer31_did_not_notify_owner)
+        end,
+    receive
+        {enet, connect, remote, {_P13, _Cs13}, ConnectID31} -> ok
+    after 1000 ->
+            exit(peer13_did_not_notify_owner)
+    end,
+    ok = enet:broadcast_reliable(Host1, 0, <<"host1->broadcast">>),
+    ok = enet:broadcast_reliable(Host2, 0, <<"host2->broadcast">>),
+    ok = enet:broadcast_reliable(Host3, 0, <<"host3->broadcast">>),
+    receive
+        {enet, 0, #reliable{ data = <<"host1->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #reliable{ data = <<"host1->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #reliable{ data = <<"host2->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #reliable{ data = <<"host2->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #reliable{ data = <<"host3->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    receive
+        {enet, 0, #reliable{ data = <<"host3->broadcast">> }} -> ok
+    after 500 ->
+            exit(channel_did_not_send_data_to_owner)
+    end,
+    ok = enet:stop_host(Host1),
+    ok = enet:stop_host(Host2),
+    ok = enet:stop_host(Host3).
