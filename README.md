@@ -19,7 +19,7 @@ channels() = #{ non_neg_integer() := pid() }
 
 ### Functions
 ```erlang
-start_host(Port, ConnectFun, Options) -> {ok, pid()} | {error, atom()}
+start_host(Port, ConnectFun, Options) -> {ok, port_number()} | {error, atom()}
 
     Port = port_number()
     ConnectFun = fun((IP, Port) -> pid())
@@ -32,7 +32,7 @@ start_host(Port, ConnectFun, Options) -> {ok, pid()} | {error, atom()}
       {incoming_bandwidth, bytes_per_second()} |
       {outgoing_bandwidth, bytes_per_second()}
 ```
-Start a new host listening on `Port`.
+Start a new host. If `Port` set to `0`, the port will be dynamically assigned by the underlying operating system. The assigned port is returned.
 
 ```erlang
 stop_host(Port) -> ok
@@ -42,14 +42,15 @@ stop_host(Port) -> ok
 Stop a host listening on `Port`.
 
 ```erlang
-connect_peer(Host, IP, Port, ChannelCount) -> {ok, Peer} | {error, atom()}
+connect_peer(HostPort, IP, RemotePort, ChannelCount) -> {ok, Peer} | {error, atom()}
 
-    Host = pid()
+    HostPort = port_number()
     IP = string()
-    Port = port_number()
+    RemotePort = port_number()
     ChannelCount = channel_count()
+    Peer = pid()
 ```
-Start a new peer on `Host` connecting to a remote host on address `IP:Port`. The peer process will call `ConnectFun` (given to start_host/3) when initiating the handshake. If a successful connect handshake has been completed, the pid returned by `ConnectFun` will receive a message `{enet, connect, local, {Host, Channels}, ConnectID}`.
+Start a new peer on the host listening on `HostPort` connecting to a remote host on address `IP:RemotePort`. The peer process will call `ConnectFun` (given to start_host/3) when initiating the handshake. If a successful connect handshake has been completed, the pid returned by `ConnectFun` will receive a message `{enet, connect, local, {Host, Channels}, ConnectID}`.
 
 ```erlang
 disconnect_peer(Peer) -> ok

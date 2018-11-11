@@ -24,7 +24,6 @@
 
 -record(host,
         {
-          pid,
           port,
           peer_count = 0,
           peer_limit,
@@ -53,23 +52,22 @@ initial_state() ->
 %%% Commands
 %%%
 
-command(S = #state{ hosts = [] }) ->
-    {call, enet, start_host,
-     [free_host_port(S), symbolic_connect_fun(), host_options()]};
+command(#state{ hosts = [] }) ->
+    {call, enet, start_host, [0, symbolic_connect_fun(), host_options()]};
 
 command(S) ->
     Peers = [P || H <- S#state.hosts, P <- H#host.peers],
     oneof(
       [
-       {call, enet, start_host,
-        [free_host_port(S), symbolic_connect_fun(), host_options()]},
+       {call, enet, start_host, [0, symbolic_connect_fun(), host_options()]},
 
        ?LET(#host{ port = Port }, started_host(S),
             {call, enet_sync, stop_host, [Port]}),
 
-       ?LET(#host{ port = Port, channel_limit = Limit }, started_host(S),
+       ?LET(#host{ port = Port, channel_limit = Limit },
+            started_host(S),
             {call, enet_sync, connect,
-             [host_pid(S), Port, channel_count(Limit)]})
+             [host_port(S), Port, channel_count(Limit)]})
       ]
 
       ++ [?LET(#peer{ connect_id = ConnectID }, oneof(Peers),
@@ -120,13 +118,12 @@ precondition(_S, {call, _, _, _}) ->
 %%% State transitions
 %%%
 
-next_state(S, V, {call, _, start_host, [Port, _ConnectFun, Options]}) ->
-    HostPid = {call, erlang, element, [2, V]},
+next_state(S, V, {call, _, start_host, [_Port, _ConnectFun, Options]}) ->
+    HostPort = {call, erlang, element, [2, V]},
     {peer_limit, PeerLimit} = lists:keyfind(peer_limit, 1, Options),
     {channel_limit, ChannelLimit} = lists:keyfind(channel_limit, 1, Options),
     Host = #host{
-              pid = HostPid,
-              port = Port,
+              port = HostPort,
               peer_limit = PeerLimit,
               channel_limit = ChannelLimit
              },
@@ -150,8 +147,10 @@ next_state(S, _V, {call, enet_sync, stop_host, [Port]}) ->
               TheOtherHosts),
     S#state{ hosts = Hosts };
 
-next_state(S, V, {call, enet_sync, connect, [HostPid, Port, ChannelCount]}) ->
-    case {get_host_with_pid(S, HostPid), get_host_with_port(S, Port)} of
+next_state(S, V, {call, enet_sync, connect, [LPort, RPort, ChannelCount]}) ->
+    H1 = get_host_with_port(S, LPort),
+    H2 = get_host_with_port(S, RPort),
+    case {H1, H2} of
         {_, #host{ peer_limit = L, peer_count = L }} ->
             %% Trying to connect to a full remote host -> timeout
             S;
@@ -184,7 +183,7 @@ next_state(S, V, {call, enet_sync, connect, [HostPid, Port, ChannelCount]}) ->
                      peer_count = C + 2,
                      peers = [Peer1, Peer2 | H1#host.peers]
                     },
-            Hosts1 = lists:keyreplace(HostPid, #host.pid, S#state.hosts, NewH1),
+            Hosts1 = lists:keyreplace(LPort, #host.port, S#state.hosts, NewH1),
             S#state{
               hosts = Hosts1
              };
@@ -214,8 +213,8 @@ next_state(S, V, {call, enet_sync, connect, [HostPid, Port, ChannelCount]}) ->
                      peer_count = H2#host.peer_count + 1,
                      peers = [Peer2 | H2#host.peers]
                     },
-            Hosts1 = lists:keyreplace(HostPid, #host.pid, S#state.hosts, NewH1),
-            Hosts2 = lists:keyreplace(Port, #host.port, Hosts1, NewH2),
+            Hosts1 = lists:keyreplace(LPort, #host.port, S#state.hosts, NewH1),
+            Hosts2 = lists:keyreplace(RPort, #host.port, Hosts1, NewH2),
             S#state{
               hosts = Hosts2
              }
@@ -252,10 +251,10 @@ next_state(S, _V, {call, _, send_reliable, [_ChannelPid, _Data]}) ->
 %%% Post-conditions
 %%%
 
-postcondition(_S, {call, _, start_host, [_Port, _ConnectFun, _Options]}, Res) ->
+postcondition(_S, {call, _, start_host, [_P, _ConnectFun, _Options]}, Res) ->
     case Res of
         {error, _Reason} -> false;
-        {ok, _Pid}       -> true
+        {ok, _Port}      -> true
     end;
 
 postcondition(S, {call, enet_sync, stop_host, [Port]}, Res) ->
@@ -264,8 +263,10 @@ postcondition(S, {call, enet_sync, stop_host, [Port]}, Res) ->
         #host{} -> Res =:= ok
     end;
 
-postcondition(S, {call, enet_sync, connect, [HostPid, Port, _Channels]}, Res) ->
-    case {get_host_with_pid(S, HostPid), get_host_with_port(S, Port)} of
+postcondition(S, {call, enet_sync, connect, [LPort, RPort, _C]}, Res) ->
+    H1 = get_host_with_port(S, LPort),
+    H2 = get_host_with_port(S, RPort),
+    case {H1, H2} of
         {#host{ peer_limit = L, peer_count = L }, #host{}} ->
             %% Tried to connect from a full host -> peer_limit_reached
             Res =:= {error, reached_peer_limit};
@@ -336,10 +337,6 @@ prop_sync_loopback() ->
 %%% Generators
 %%%
 
-free_host_port(#state{ hosts = Hosts }) ->
-    ?SUCHTHAT(Port, integer(35000, 35999),
-              not lists:keymember(Port, #host.port, Hosts)).
-
 busy_host_port(S = #state{}) ->
     ?LET(#host{ port = Port }, started_host(S), Port).
 
@@ -356,8 +353,8 @@ host_options() ->
 started_host(#state{ hosts = Hosts }) ->
     oneof(Hosts).
 
-host_pid(#state{ hosts = Hosts }) ->
-    oneof([Pid || #host{ pid = Pid } <- Hosts]).
+host_port(#state{ hosts = Hosts }) ->
+    oneof([Port || #host{ port = Port } <- Hosts]).
 
 peer_pid(#state{ hosts = Hosts }) ->
     oneof([Pid || #host{ peers = Peers } <- Hosts,
@@ -393,9 +390,6 @@ message_data() ->
 %%%
 %%% Misc
 %%%
-
-get_host_with_pid(#state{ hosts = Hosts }, HostPid) ->
-    lists:keyfind(HostPid, #host.pid, Hosts).
 
 get_host_with_port(#state{ hosts = Hosts }, Port) ->
     lists:keyfind(Port, #host.port, Hosts).

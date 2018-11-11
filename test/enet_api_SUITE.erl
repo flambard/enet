@@ -46,18 +46,18 @@ all() ->
 local_zero_peer_limit_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 0}]),
-    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 1}]),
+    {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 0}]),
+    {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
     {error, reached_peer_limit} =
-        enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
-    ok = enet:stop_host(5001),
-    ok = enet:stop_host(5002).
+        enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
+    ok = enet:stop_host(LocalHost),
+    ok = enet:stop_host(RemoteHost).
 
 remote_zero_peer_limit_test(_Config) ->
     ConnectFun = fun(_IP, _Port) -> self() end,
-    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 1}]),
-    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 0}]),
-    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
+    {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 0}]),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     receive
         {enet, connect, local, {LocalPeer, _LocalChannels}, _ConnectID} ->
             exit(peer_could_connect_despite_peer_limit_reached);
@@ -66,15 +66,15 @@ remote_zero_peer_limit_test(_Config) ->
     after 200 -> %% How long time is enough? (This is ugly)
             ok
     end,
-    ok = enet:stop_host(5001),
-    ok = enet:stop_host(5002).
+    ok = enet:stop_host(LocalHost),
+    ok = enet:stop_host(RemoteHost).
 
 local_disconnect_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
-    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
-    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     ConnectID =
         receive
             {enet, connect, local, {LocalPeer, _LocalChannels}, C} -> C
@@ -110,16 +110,15 @@ local_disconnect_test(_Config) ->
     after 1000 ->
             exit(remote_peer_did_not_exit)
     end,
-    ok = enet:stop_host(5001),
-    ok = enet:stop_host(5002),
-    ok.
+    ok = enet:stop_host(LocalHost),
+    ok = enet:stop_host(RemoteHost).
 
 remote_disconnect_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
-    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
-    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     ConnectID =
         receive
             {enet, connect, local, {LocalPeer, _LocalChannels}, C} -> C
@@ -155,16 +154,15 @@ remote_disconnect_test(_Config) ->
     after 1000 ->
             exit(remote_peer_did_not_exit)
     end,
-    ok = enet:stop_host(5001),
-    ok = enet:stop_host(5002),
-    ok.
+    ok = enet:stop_host(LocalHost),
+    ok = enet:stop_host(RemoteHost).
 
 unsequenced_messages_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
-    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
-    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     {ConnectID, LocalChannels} =
         receive
             {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
@@ -191,16 +189,15 @@ unsequenced_messages_test(_Config) ->
     after 500 ->
             exit(local_channel_did_not_send_data_to_owner)
     end,
-    ok = enet:stop_host(5001),
-    ok = enet:stop_host(5002),
-    ok.
+    ok = enet:stop_host(LocalHost),
+    ok = enet:stop_host(RemoteHost).
 
 unreliable_messages_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
-    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
-    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     {ConnectID, LocalChannels} =
         receive
             {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
@@ -239,16 +236,15 @@ unreliable_messages_test(_Config) ->
     after 500 ->
             exit(local_channel_did_not_send_data_to_owner)
     end,
-    ok = enet:stop_host(5001),
-    ok = enet:stop_host(5002),
-    ok.
+    ok = enet:stop_host(LocalHost),
+    ok = enet:stop_host(RemoteHost).
 
 reliable_messages_test(_Config) ->
     Self = self(),
     ConnectFun = fun(_IP, _Port) -> Self end,
-    {ok, LocalHost}   = enet:start_host(5001, ConnectFun, [{peer_limit, 8}]),
-    {ok, _RemoteHost} = enet:start_host(5002, ConnectFun, [{peer_limit, 8}]),
-    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", 5002, 1),
+    {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     {ConnectID, LocalChannels} =
         receive
             {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
@@ -287,6 +283,5 @@ reliable_messages_test(_Config) ->
     after 500 ->
             exit(local_channel_did_not_send_data_to_owner)
     end,
-    ok = enet:stop_host(5001),
-    ok = enet:stop_host(5002),
-    ok.
+    ok = enet:stop_host(LocalHost),
+    ok = enet:stop_host(RemoteHost).

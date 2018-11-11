@@ -8,6 +8,8 @@
 %% API
 -export([
          start_link/3,
+         socket_options/0,
+         give_socket/2,
          connect/4,
          send_outgoing_commands/4,
          send_outgoing_commands/5,
@@ -46,6 +48,13 @@
 start_link(Port, ConnectFun, Options) ->
     gen_server:start_link(?MODULE, {Port, ConnectFun, Options}, []).
 
+socket_options() ->
+    [binary, {active, false}, {reuseaddr, true}].
+
+give_socket(Host, Socket) ->
+    ok = gen_udp:controlling_process(Socket, Host),
+    gen_server:cast(Host, {give_socket, Socket}).
+
 connect(Host, IP, Port, ChannelCount) ->
     gen_server:call(Host, {connect, IP, Port, ChannelCount}).
 
@@ -75,8 +84,8 @@ get_channel_limit(Host) ->
 %%% gen_server callbacks
 %%%===================================================================
 
-init({Port, ConnectFun, Options}) ->
-    true = gproc:reg({n, l, {enet_host, Port}}),
+init({AssignedPort, ConnectFun, Options}) ->
+    true = gproc:reg({n, l, {enet_host, AssignedPort}}),
     ChannelLimit =
         case lists:keyfind(channel_limit, 1, Options) of
             {channel_limit, CLimit} -> CLimit;
@@ -94,22 +103,28 @@ init({Port, ConnectFun, Options}) ->
         end,
     true = gproc:mreg(p, l,
                       [
-                       {port, Port},
+                       {port, AssignedPort},
                        {channel_limit, ChannelLimit},
                        {incoming_bandwidth, IncomingBandwidth},
                        {outgoing_bandwidth, OutgoingBandwidth},
                        {mtu, ?HOST_DEFAULT_MTU}
                       ]),
-    SocketOptions = [
-                     binary,
-                     {active, true},
-                     {reuseaddr, true}
-                    ],
-    {ok, Socket} = gen_udp:open(Port, SocketOptions),
-    {ok, #state{
-            socket = Socket,
-            connect_fun = ConnectFun
-           }}.
+    case gen_udp:open(AssignedPort, socket_options()) of
+        {error, eaddrinuse} ->
+            %%
+            %% A socket has already been opened on this port
+            %% - The socket will be given to us later
+            %%
+            {ok, #state{ connect_fun = ConnectFun }};
+        {ok, Socket} ->
+            %%
+            %% We were able to open a new socket on this port
+            %% - It means we have been restarted by the supervisor
+            %% - Set it to active mode
+            %%
+            ok = inet:setopts(Socket, [{active, true}]),
+            {ok, #state{ connect_fun = ConnectFun, socket = Socket }}
+    end.
 
 
 handle_call({connect, IP, Port, Channels}, _From, S) ->
@@ -156,6 +171,10 @@ handle_call({send_outgoing_commands, Commands, IP, Port, ID}, _From, S) ->
 %%%
 %%% handle_cast
 %%%
+
+handle_cast({give_socket, Socket}, S) ->
+    ok = inet:setopts(Socket, [{active, true}]),
+    {noreply, S#state{ socket = Socket }};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.

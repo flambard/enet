@@ -12,41 +12,50 @@
          send_reliable/2
         ]).
 
-
 -type port_number() :: 0..65535.
 
+
+%%%===================================================================
+%%% API
+%%%===================================================================
 
 -spec start_host(Port :: port_number(),
                  ConnectFun :: fun((string(), port_number()) -> pid()),
                  Options :: [{atom(), term()}]) ->
-                        {ok, pid()} | {error, atom()}.
+                        {ok, port_number()} | {error, atom()}.
 
 start_host(Port, ConnectFun, Options) ->
-    case enet_sup:start_host_supervisor(Port, ConnectFun, Options) of
+    {ok, Socket} = gen_udp:open(Port, enet_host:socket_options()),
+    {ok, AssignedPort} = inet:port(Socket),
+    case enet_sup:start_host_supervisor(AssignedPort, ConnectFun, Options) of
         {error, Reason} -> {error, Reason};
         {ok, _HostSup} ->
-            Host = gproc:where({n, l, {enet_host, Port}}),
-            {ok, Host}
+            Host = gproc:where({n, l, {enet_host, AssignedPort}}),
+            enet_host:give_socket(Host, Socket),
+            {ok, AssignedPort}
     end.
 
 
--spec stop_host(Port :: port_number()) -> ok.
+-spec stop_host(HostPort :: port_number()) -> ok.
 
-stop_host(Port) ->
-    enet_sup:stop_host_supervisor(Port).
+stop_host(HostPort) ->
+    enet_sup:stop_host_supervisor(HostPort).
 
 
--spec connect_peer(Host :: pid(), IP :: string(), Port :: port_number(),
+-spec connect_peer(HostPort :: port_number(),
+                   IP :: string(),
+                   RemotePort :: port_number(),
                    ChannelCount :: pos_integer()) ->
                           {ok, pid()} | {error, atom()}.
 
-connect_peer(Host, IP, Port, ChannelCount) ->
-    enet_host:connect(Host, IP, Port, ChannelCount).
+connect_peer(HostPort, IP, RemotePort, ChannelCount) ->
+    Host = gproc:where({n, l, {enet_host, HostPort}}),
+    enet_host:connect(Host, IP, RemotePort, ChannelCount).
 
 
 await_connect() ->
     receive
-        C = {enet, connect, LocalOrRemote, PC, ConnectID} -> {ok, C}
+        C = {enet, connect, _LocalOrRemote, _PC, _ConnectID} -> {ok, C}
     after 1000 -> {error, timeout}
     end.
 
@@ -79,3 +88,9 @@ send_unreliable(Channel, Data) ->
 
 send_reliable(Channel, Data) ->
     enet_channel:send_reliable(Channel, Data).
+
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
+
