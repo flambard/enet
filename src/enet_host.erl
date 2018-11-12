@@ -142,16 +142,22 @@ handle_call({connect, IP, Port, Channels}, _From, S) ->
     Reply =
         try enet_pool:add_worker(LocalPort, Ref) of
             PeerID ->
-                start_peer(#enet_peer{
-                              handshake_flow = local,
-                              peer_id = PeerID,
-                              ip = IP,
-                              port = Port,
-                              worker_name = Ref,
-                              host = self(),
-                              channels = Channels,
-                              connect_fun = ConnectFun
-                             })
+                Peer = #enet_peer{
+                          handshake_flow = local,
+                          peer_id = PeerID,
+                          ip = IP,
+                          port = Port,
+                          worker_name = Ref,
+                          host = self(),
+                          channels = Channels,
+                          connect_fun = ConnectFun
+                         },
+                case start_peer(Peer) of
+                    {ok, Pid}       -> {ok, Pid};
+                    {error, Reason} ->
+                        true = enet_pool:remove_worker(LocalPort, Ref),
+                        {error, Reason}
+                end
         catch
             error:pool_full -> {error, reached_peer_limit};
             error:exists    -> {error, exists}
@@ -227,16 +233,22 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
             Ref = make_ref(),
             try enet_pool:add_worker(LocalPort, Ref) of
                 PeerID ->
-                    {ok, Pid} = start_peer(#enet_peer{
-                                              handshake_flow = remote,
-                                              peer_id = PeerID,
-                                              ip = IP,
-                                              port = Port,
-                                              worker_name = Ref,
-                                              host = self(),
-                                              connect_fun = ConnectFun
-                                             }),
-                    ok = enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
+                    Peer = #enet_peer{
+                              handshake_flow = remote,
+                              peer_id = PeerID,
+                              ip = IP,
+                              port = Port,
+                              worker_name = Ref,
+                              host = self(),
+                              connect_fun = ConnectFun
+                             },
+                    case start_peer(Peer) of
+                        {error, _Reason} ->
+                            true = enet_pool:remove_worker(LocalPort, Ref);
+                        {ok, Pid} ->
+                            ok = enet_peer:recv_incoming_packet(
+                                   Pid, SentTime, Commands)
+                    end
             catch
                 error:pool_full -> {error, reached_peer_limit};
                 error:exists    -> {error, exists}
@@ -286,7 +298,10 @@ get_time() ->
 start_peer(Peer = #enet_peer{ worker_name = Ref }) ->
     LocalPort = gproc:get_value({p, l, port}, self()),
     PeerSup = gproc:where({n, l, {enet_peer_sup, LocalPort}}),
-    {ok, Pid} = enet_peer_sup:start_peer(PeerSup, Peer),
-    true = gproc:reg_other({n, l, {worker, Ref}}, Pid),
-    _Ref = gproc:monitor({n, l, {worker, Ref}}),
-    {ok, Pid}.
+    case enet_peer_sup:start_peer(PeerSup, Peer) of
+        {error, Reason} -> {error, Reason};
+        {ok, Pid} ->
+            true = gproc:reg_other({n, l, {worker, Ref}}, Pid),
+            _Ref = gproc:monitor({n, l, {worker, Ref}}),
+            {ok, Pid}
+    end.

@@ -23,7 +23,7 @@
 %%%===================================================================
 
 -spec start_host(Port :: port_number(),
-                 ConnectFun :: fun((map()) -> pid()),
+                 ConnectFun :: fun((map()) -> {ok, pid()} | {error, term()}),
                  Options :: [{atom(), term()}]) ->
                         {ok, port_number()} | {error, atom()}.
 

@@ -32,6 +32,7 @@ groups() ->
 
 all() ->
     [
+     local_worker_init_error_test,
      local_zero_peer_limit_test,
      remote_zero_peer_limit_test,
      local_disconnect_test,
@@ -45,10 +46,18 @@ all() ->
     ].
 
 
+local_worker_init_error_test(_Config) ->
+    ConnectFun = fun(_PeerInfo) -> {error, whatever} end,
+    {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
+    {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
+    {error, {worker_init_error, whatever}} =
+        enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
+    ok = enet:stop_host(LocalHost),
+    ok = enet:stop_host(RemoteHost).
 
 local_zero_peer_limit_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> Self end,
+    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 0}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
     {error, reached_peer_limit} =
@@ -57,7 +66,8 @@ local_zero_peer_limit_test(_Config) ->
     ok = enet:stop_host(RemoteHost).
 
 remote_zero_peer_limit_test(_Config) ->
-    ConnectFun = fun(_PeerInfo) -> self() end,
+    Self = self(),
+    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 0}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
@@ -74,7 +84,7 @@ remote_zero_peer_limit_test(_Config) ->
 
 local_disconnect_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> Self end,
+    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
@@ -118,7 +128,7 @@ local_disconnect_test(_Config) ->
 
 remote_disconnect_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> Self end,
+    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
@@ -162,7 +172,7 @@ remote_disconnect_test(_Config) ->
 
 unsequenced_messages_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> Self end,
+    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
@@ -197,7 +207,7 @@ unsequenced_messages_test(_Config) ->
 
 unreliable_messages_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> Self end,
+    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
@@ -244,7 +254,7 @@ unreliable_messages_test(_Config) ->
 
 reliable_messages_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> Self end,
+    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
@@ -291,7 +301,7 @@ reliable_messages_test(_Config) ->
 
 unsequenced_broadcast_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> Self end,
+    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
     {ok, Host1} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host2} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host3} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
@@ -370,7 +380,7 @@ unsequenced_broadcast_test(_Config) ->
 
 unreliable_broadcast_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> Self end,
+    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
     {ok, Host1} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host2} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host3} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
@@ -449,7 +459,7 @@ unreliable_broadcast_test(_Config) ->
 
 reliable_broadcast_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> Self end,
+    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
     {ok, Host1} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host2} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host3} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),

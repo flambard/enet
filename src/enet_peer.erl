@@ -171,18 +171,22 @@ init(P = #enet_peer{ handshake_flow = local }) ->
     enet_pool:connect_worker(LocalPort, Ref),
     gproc:reg({p, l, worker_name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
-    Owner = ConnectFun(#{ip => IP, port => Port}),
-    _Ref = monitor(process, Owner),
-    Channels = start_channels(N, Owner),
-    S = #state{
-           owner = Owner,
-           channels = Channels,
-           host = Host,
-           ip = IP,
-           port = Port,
-           peer_id = PeerID
-          },
-    {ok, connecting, S};
+    case ConnectFun(#{ip => IP, port => Port}) of
+        {error, Reason} ->
+            {stop, {worker_init_error, Reason}};
+        {ok, Owner} ->
+            _Ref = monitor(process, Owner),
+            Channels = start_channels(N, Owner),
+            S = #state{
+                   owner = Owner,
+                   channels = Channels,
+                   host = Host,
+                   ip = IP,
+                   port = Port,
+                   peer_id = PeerID
+                  },
+            {ok, connecting, S}
+    end;
 
 init(P = #enet_peer{ handshake_flow = remote }) ->
     %%
@@ -203,16 +207,20 @@ init(P = #enet_peer{ handshake_flow = remote }) ->
     enet_pool:connect_worker(LocalPort, Ref),
     gproc:reg({p, l, worker_name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
-    Owner = ConnectFun(#{ip => IP, port => Port}),
-    _Ref = monitor(process, Owner),
-    S = #state{
-           owner = Owner,
-           host = Host,
-           ip = IP,
-           port = Port,
-           peer_id = PeerID
-          },
-    {ok, acknowledging_connect, S}.
+    case ConnectFun(#{ip => IP, port => Port}) of
+        {error, Reason} ->
+            {error, {worker_init_error, Reason}};
+        {ok, Owner} ->
+            _Ref = monitor(process, Owner),
+            S = #state{
+                   owner = Owner,
+                   host = Host,
+                   ip = IP,
+                   port = Port,
+                   peer_id = PeerID
+                  },
+            {ok, acknowledging_connect, S}
+    end.
 
 
 callback_mode() ->

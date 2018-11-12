@@ -22,8 +22,9 @@ channels() = #{ non_neg_integer() := pid() }
 start_host(Port, ConnectFun, Options) -> {ok, port_number()} | {error, atom()}
 
     Port = port_number()
-    ConnectFun = fun((PeerInfo) -> pid())
+    ConnectFun = fun((PeerInfo) -> ConnectFunResult)
     PeerInfo = map()
+    ConnectFunResult = {ok, pid()} | {error, term()}
     Options = [Option]
     Option =
       {peer_limit, peer_count()} |

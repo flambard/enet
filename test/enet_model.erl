@@ -345,7 +345,7 @@ symbolic_connect_fun() ->
 
 connect_fun() ->
     Self = self(),
-    fun(_PeerInfo) -> Self end.
+    fun(_PeerInfo) -> {ok, Self} end.
 
 host_options() ->
     [{peer_limit, integer(1, 255)}, {channel_limit, integer(1, 8)}].
