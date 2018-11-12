@@ -171,7 +171,7 @@ init({local_connect, Ref, Host, N, PeerID, IP, Port, ConnectFun}) ->
     enet_pool:connect_worker(LocalPort, Ref),
     gproc:reg({p, l, worker_name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
-    Owner = ConnectFun(IP, Port),
+    Owner = ConnectFun(#{ip => IP, port => Port}),
     _Ref = monitor(process, Owner),
     Channels = start_channels(N, Owner),
     S = #state{
@@ -195,7 +195,7 @@ init({remote_connect, Ref, Host, PeerID, IP, Port, ConnectFun}) ->
     enet_pool:connect_worker(LocalPort, Ref),
     gproc:reg({p, l, worker_name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
-    Owner = ConnectFun(IP, Port),
+    Owner = ConnectFun(#{ip => IP, port => Port}),
     _Ref = monitor(process, Owner),
     S = #state{
            owner = Owner,
