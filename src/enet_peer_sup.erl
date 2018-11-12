@@ -4,8 +4,7 @@
 %% API
 -export([
          start_link/1,
-         start_peer_local/8,
-         start_peer_remote/7
+         start_peer/2
         ]).
 
 %% Supervisor callbacks
@@ -19,13 +18,8 @@
 start_link(Port) ->
     supervisor:start_link(?MODULE, [Port]).
 
-start_peer_local(Supervisor, Ref, Host, N, PeerID, IP, Port, ConnectFun) ->
-    Args = [local, Ref, Host, N, PeerID, IP, Port, ConnectFun],
-    supervisor:start_child(Supervisor, Args).
-
-start_peer_remote(Supervisor, Ref, Host, PeerID, IP, Port, ConnectFun) ->
-    Args = [remote, Ref, Host, PeerID, IP, Port, ConnectFun],
-    supervisor:start_child(Supervisor, Args).
+start_peer(Supervisor, Peer) ->
+    supervisor:start_child(Supervisor, [Peer]).
 
 
 %%%===================================================================

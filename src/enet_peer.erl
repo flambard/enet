@@ -1,13 +1,13 @@
 -module(enet_peer).
 -behaviour(gen_statem).
 
+-include("enet_peer.hrl").
 -include("enet_commands.hrl").
 -include("enet_protocol.hrl").
 
 %% API
 -export([
-         start_link/8,
-         start_link/7,
+         start_link/1,
          disconnect/1,
          disconnect_now/1,
          channels/1,
@@ -113,17 +113,8 @@
 %%% API
 %%%===================================================================
 
-start_link(local, Ref, Host, N, PeerID, IP, Port, ConnectFun) ->
-    gen_statem:start_link(
-      ?MODULE,
-      {local_connect, Ref, Host, N, PeerID, IP, Port, ConnectFun},
-      []).
-
-start_link(remote, Ref, Host, PeerID, IP, Port, ConnectFun) ->
-    gen_statem:start_link(
-      ?MODULE,
-      {remote_connect, Ref, Host, PeerID, IP, Port, ConnectFun},
-      []).
+start_link(Peer) ->
+    gen_statem:start_link(?MODULE, Peer, []).
 
 disconnect(Peer) ->
     gen_statem:cast(Peer, disconnect).
@@ -160,13 +151,22 @@ get_peer_id(Peer) ->
 %%% gen_statem callbacks
 %%%===================================================================
 
-init({local_connect, Ref, Host, N, PeerID, IP, Port, ConnectFun}) ->
+init(P = #enet_peer{ handshake_flow = local }) ->
     %%
     %% The client application wants to connect to a remote peer.
     %%
     %% - Send a Connect command to the remote peer (use peer ID)
     %% - Start in the 'connecting' state
     %%
+    #enet_peer{
+       peer_id = PeerID,
+       ip = IP,
+       port = Port,
+       worker_name = Ref,
+       host = Host,
+       channels = N,
+       connect_fun = ConnectFun
+      } = P,
     LocalPort = enet_host:get_port(Host),
     enet_pool:connect_worker(LocalPort, Ref),
     gproc:reg({p, l, worker_name}, Ref),
@@ -184,13 +184,21 @@ init({local_connect, Ref, Host, N, PeerID, IP, Port, ConnectFun}) ->
           },
     {ok, connecting, S};
 
-init({remote_connect, Ref, Host, PeerID, IP, Port, ConnectFun}) ->
+init(P = #enet_peer{ handshake_flow = remote }) ->
     %%
     %% A remote peer wants to connect to the client application.
     %%
     %% - Start in the 'acknowledging_connect' state
     %% - Handle the received Connect command
     %%
+    #enet_peer{
+       peer_id = PeerID,
+       ip = IP,
+       port = Port,
+       worker_name = Ref,
+       host = Host,
+       connect_fun = ConnectFun
+      } = P,
     LocalPort = enet_host:get_port(Host),
     enet_pool:connect_worker(LocalPort, Ref),
     gproc:reg({p, l, worker_name}, Ref),

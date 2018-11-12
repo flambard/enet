@@ -142,7 +142,16 @@ handle_call({connect, IP, Port, Channels}, _From, S) ->
     Reply =
         try enet_pool:add_worker(LocalPort, Ref) of
             PeerID ->
-                start_peer_local(Channels, PeerID, IP, Port, Ref, ConnectFun)
+                start_peer(#enet_peer{
+                              handshake_flow = local,
+                              peer_id = PeerID,
+                              ip = IP,
+                              port = Port,
+                              worker_name = Ref,
+                              host = self(),
+                              channels = Channels,
+                              connect_fun = ConnectFun
+                             })
         catch
             error:pool_full -> {error, reached_peer_limit};
             error:exists    -> {error, exists}
@@ -218,8 +227,15 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
             Ref = make_ref(),
             try enet_pool:add_worker(LocalPort, Ref) of
                 PeerID ->
-                    {ok, Pid} =
-                        start_peer_remote(PeerID, IP, Port, Ref, ConnectFun),
+                    {ok, Pid} = start_peer(#enet_peer{
+                                              handshake_flow = remote,
+                                              peer_id = PeerID,
+                                              ip = IP,
+                                              port = Port,
+                                              worker_name = Ref,
+                                              host = self(),
+                                              connect_fun = ConnectFun
+                                             }),
                     ok = enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
             catch
                 error:pool_full -> {error, reached_peer_limit};
@@ -267,24 +283,10 @@ code_change(_OldVsn, State, _Extra) ->
 get_time() ->
     erlang:system_time(1000) band 16#FFFF.
 
-start_peer_local(N, PeerID, IP, RPort, Ref, ConnectFun) ->
-    PeerSup = locate_peer_supervisor(),
-    {ok, Pid} =
-        enet_peer_sup:start_peer_local(
-          PeerSup, Ref, self(), N, PeerID, IP, RPort, ConnectFun),
-    true = gproc:reg_other({n, l, {worker, Ref}}, Pid),
-    _Ref = gproc:monitor({n, l, {worker, Ref}}),
-    {ok, Pid}.
-
-start_peer_remote(PeerID, IP, RPort, Ref, ConnectFun) ->
-    PeerSup = locate_peer_supervisor(),
-    {ok, Pid} =
-        enet_peer_sup:start_peer_remote(
-          PeerSup, Ref, self(), PeerID, IP, RPort, ConnectFun),
-    true = gproc:reg_other({n, l, {worker, Ref}}, Pid),
-    _Ref = gproc:monitor({n, l, {worker, Ref}}),
-    {ok, Pid}.
-
-locate_peer_supervisor() ->
+start_peer(Peer = #enet_peer{ worker_name = Ref }) ->
     LocalPort = gproc:get_value({p, l, port}, self()),
-    gproc:where({n, l, {enet_peer_sup, LocalPort}}).
+    PeerSup = gproc:where({n, l, {enet_peer_sup, LocalPort}}),
+    {ok, Pid} = enet_peer_sup:start_peer(PeerSup, Peer),
+    true = gproc:reg_other({n, l, {worker, Ref}}, Pid),
+    _Ref = gproc:monitor({n, l, {worker, Ref}}),
+    {ok, Pid}.

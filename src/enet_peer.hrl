@@ -1,8 +1,11 @@
--record(peer,
+-record(enet_peer,
         {
-          id,
-          pid,
-          remote_id,
-          ip,
-          port
+         handshake_flow,
+         peer_id,
+         ip,
+         port,
+         worker_name,
+         host,
+         channels,
+         connect_fun
         }).
