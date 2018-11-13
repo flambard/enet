@@ -7,7 +7,7 @@
 
 %% API
 -export([
-         start_link/1,
+         start_link/2,
          disconnect/1,
          disconnect_now/1,
          channels/1,
@@ -40,26 +40,27 @@
 
 -record(state,
         {
-          owner,
-          host,
-          channels,
-          ip,
-          port,
-          remote_peer_id = undefined,
-          peer_id,
-          incoming_session_id = 16#FF,
-          outgoing_session_id = 16#FF,
-          incoming_bandwidth = 0,
-          outgoing_bandwidth = 0,
-          window_size = ?MAX_WINDOW_SIZE,
-          packet_throttle_interval = ?PEER_PACKET_THROTTLE_INTERVAL,
-          packet_throttle_acceleration = ?PEER_PACKET_THROTTLE_ACCELERATION,
-          packet_throttle_deceleration = ?PEER_PACKET_THROTTLE_DECELERATION,
-          outgoing_reliable_sequence_number = 1,
-          incoming_unsequenced_group = 0,
-          outgoing_unsequenced_group = 1,
-          unsequenced_window = 0,
-          connect_id
+         owner,
+         host,
+         channels,
+         local_port,
+         ip,
+         port,
+         remote_peer_id = undefined,
+         peer_id,
+         incoming_session_id = 16#FF,
+         outgoing_session_id = 16#FF,
+         incoming_bandwidth = 0,
+         outgoing_bandwidth = 0,
+         window_size = ?MAX_WINDOW_SIZE,
+         packet_throttle_interval = ?PEER_PACKET_THROTTLE_INTERVAL,
+         packet_throttle_acceleration = ?PEER_PACKET_THROTTLE_ACCELERATION,
+         packet_throttle_deceleration = ?PEER_PACKET_THROTTLE_DECELERATION,
+         outgoing_reliable_sequence_number = 1,
+         incoming_unsequenced_group = 0,
+         outgoing_unsequenced_group = 1,
+         unsequenced_window = 0,
+         connect_id
         }).
 
 
@@ -113,8 +114,8 @@
 %%% API
 %%%===================================================================
 
-start_link(Peer) ->
-    gen_statem:start_link(?MODULE, Peer, []).
+start_link(LocalPort, Peer) ->
+    gen_statem:start_link(?MODULE, [LocalPort, Peer], []).
 
 disconnect(Peer) ->
     gen_statem:cast(Peer, disconnect).
@@ -151,7 +152,7 @@ get_peer_id(Peer) ->
 %%% gen_statem callbacks
 %%%===================================================================
 
-init(P = #enet_peer{ handshake_flow = local }) ->
+init([LocalPort, P = #enet_peer{ handshake_flow = local }]) ->
     %%
     %% The client application wants to connect to a remote peer.
     %%
@@ -167,7 +168,6 @@ init(P = #enet_peer{ handshake_flow = local }) ->
        channels = N,
        connect_fun = ConnectFun
       } = P,
-    LocalPort = enet_host:get_port(Host),
     enet_pool:connect_worker(LocalPort, Ref),
     gproc:reg({p, l, worker_name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
@@ -181,6 +181,7 @@ init(P = #enet_peer{ handshake_flow = local }) ->
                    owner = Owner,
                    channels = Channels,
                    host = Host,
+                   local_port = LocalPort,
                    ip = IP,
                    port = Port,
                    peer_id = PeerID
@@ -188,7 +189,7 @@ init(P = #enet_peer{ handshake_flow = local }) ->
             {ok, connecting, S}
     end;
 
-init(P = #enet_peer{ handshake_flow = remote }) ->
+init([LocalPort, P = #enet_peer{ handshake_flow = remote }]) ->
     %%
     %% A remote peer wants to connect to the client application.
     %%
@@ -203,7 +204,6 @@ init(P = #enet_peer{ handshake_flow = remote }) ->
        host = Host,
        connect_fun = ConnectFun
       } = P,
-    LocalPort = enet_host:get_port(Host),
     enet_pool:connect_worker(LocalPort, Ref),
     gproc:reg({p, l, worker_name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
@@ -215,6 +215,7 @@ init(P = #enet_peer{ handshake_flow = remote }) ->
             S = #state{
                    owner = Owner,
                    host = Host,
+                   local_port = LocalPort,
                    ip = IP,
                    port = Port,
                    peer_id = PeerID
@@ -493,7 +494,7 @@ verifying_connect(EventType, EventContent, S) ->
 
 connected(enter, _OldState, S) ->
     #state{
-       host = Host,
+       local_port = LocalPort,
        ip = IP,
        port = Port,
        remote_peer_id = RemotePeerID,
@@ -504,7 +505,6 @@ connected(enter, _OldState, S) ->
                              {remote_host_port, Port},
                              {remote_peer_id, RemotePeerID}
                             ]),
-    LocalPort = enet_host:get_port(Host),
     ok = enet_disconnector:set_trigger(LocalPort, RemotePeerID, IP, Port),
     SendTimeout = reset_send_timer(),
     RecvTimeout = reset_recv_timer(),
@@ -631,13 +631,12 @@ connected(cast, {incoming_command, {_H, #disconnect{}}}, S) ->
     %%
     #state{
        owner = Owner,
-       host = Host,
+       local_port = LocalPort,
        ip = IP,
        port = Port,
        remote_peer_id = RemotePeerID,
        connect_id = ConnectID
       } = S,
-    LocalPort = enet_host:get_port(Host),
     ok = enet_disconnector:unset_trigger(LocalPort, RemotePeerID, IP, Port),
     Owner ! {enet, disconnected, remote, self(), ConnectID},
     {stop, normal, S};
@@ -808,12 +807,11 @@ connected(EventType, EventContent, S) ->
 
 disconnecting(enter, _OldState, S) ->
     #state{
-       host = Host,
+       local_port = LocalPort,
        ip = IP,
        port = Port,
        remote_peer_id = RemotePeerID
       } = S,
-    LocalPort = enet_host:get_port(Host),
     ok = enet_disconnector:unset_trigger(LocalPort, RemotePeerID, IP, Port),
     {keep_state, S};
 
@@ -843,9 +841,8 @@ disconnecting(EventType, EventContent, S) ->
 %%% terminate
 %%%
 
-terminate(_Reason, _StateName, #state{ host = Host }) ->
+terminate(_Reason, _StateName, #state{ local_port = LocalPort }) ->
     Name = get_worker_name(self()),
-    LocalPort = enet_host:get_port(Host),
     enet_pool:disconnect_worker(LocalPort, Name),
     ok.
 

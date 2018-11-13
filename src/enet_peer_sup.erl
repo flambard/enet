@@ -35,7 +35,7 @@ init([Port]) ->
                 },
     ChildSpecs = [#{
                     id => enet_peer,
-                    start => {enet_peer, start_link, []},
+                    start => {enet_peer, start_link, [Port]},
                     restart => temporary,
                     shutdown => brutal_kill,
                     type => worker,
