@@ -12,7 +12,7 @@
          disconnect_now/1,
          channels/1,
          channel/2,
-         recv_incoming_packet/3,
+         recv_incoming_packet/4,
          send_command/2,
          get_connect_id/1,
          get_mtu/1,
@@ -129,8 +129,8 @@ channels(Peer) ->
 channel(Peer, ID) ->
     gen_statem:call(Peer, {channel, ID}).
 
-recv_incoming_packet(Peer, SentTime, Packet) ->
-    gen_statem:cast(Peer, {incoming_packet, SentTime, Packet}).
+recv_incoming_packet(Peer, FromIP, SentTime, Packet) ->
+    gen_statem:cast(Peer, {incoming_packet, FromIP, SentTime, Packet}).
 
 send_command(Peer, {H, C}) ->
     gen_statem:cast(Peer, {outgoing_command, {H, C}}).
@@ -859,14 +859,14 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-handle_event(cast, {incoming_packet, SentTime, Packet}, S) ->
+handle_event(cast, {incoming_packet, FromIP, SentTime, Packet}, S) ->
     %%
     %% Received an incoming packet of commands.
     %%
     %% - Split and decode the commands from the binary
     %% - Send the commands as individual events to ourselves
     %%
-    #state{ host = Host, ip = IP, port = Port } = S,
+    #state{ host = Host, port = Port } = S,
     {ok, Commands} = enet_protocol_decode:commands(Packet),
     lists:foreach(
       fun ({H = #command_header{ please_acknowledge = 0 }, C}) ->
@@ -894,11 +894,11 @@ handle_event(cast, {incoming_packet, SentTime, Packet}, S) ->
                   end,
               {sent_time, _AckSentTime} =
                   enet_host:send_outgoing_commands(
-                    Host, [HBin, CBin], IP, Port, RemotePeerID),
+                    Host, [HBin, CBin], FromIP, Port, RemotePeerID),
               gen_statem:cast(self(), {incoming_command, {H, C}})
       end,
       Commands),
-    {keep_state, S};
+    {keep_state, S#state{ ip = FromIP }};
 
 handle_event({call, From}, channels, S) ->
     {keep_state, S, [{reply, From, S#state.channels}]};

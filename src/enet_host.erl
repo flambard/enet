@@ -49,7 +49,7 @@ start_link(Port, ConnectFun, Options) ->
     gen_server:start_link(?MODULE, {Port, ConnectFun, Options}, []).
 
 socket_options() ->
-    [binary, {active, false}, {reuseaddr, true}].
+    [binary, {active, false}, {reuseaddr, true}, {broadcast, true}].
 
 give_socket(Host, Socket) ->
     ok = gen_udp:controlling_process(Socket, Host),
@@ -247,7 +247,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                             true = enet_pool:remove_worker(LocalPort, Ref);
                         {ok, Pid} ->
                             ok = enet_peer:recv_incoming_packet(
-                                   Pid, SentTime, Commands)
+                                   Pid, IP, SentTime, Commands)
                     end
             catch
                 error:pool_full -> {error, reached_peer_limit};
@@ -256,7 +256,8 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
         PeerID ->
             case enet_pool:pick_worker(LocalPort, PeerID) of
                 false -> ok; %% Unknown peer - drop the packet
-                Pid   -> enet_peer:recv_incoming_packet(Pid, SentTime, Commands)
+                Pid ->
+                    enet_peer:recv_incoming_packet(Pid, IP, SentTime, Commands)
             end
     end,
     {noreply, S};

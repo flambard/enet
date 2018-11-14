@@ -35,6 +35,7 @@ all() ->
      local_worker_init_error_test,
      local_zero_peer_limit_test,
      remote_zero_peer_limit_test,
+     broadcast_connect_test,
      local_disconnect_test,
      remote_disconnect_test,
      unsequenced_messages_test,
@@ -78,6 +79,51 @@ remote_zero_peer_limit_test(_Config) ->
             exit(remote_peer_started_despite_peer_limit_reached)
     after 200 -> %% How long time is enough? (This is ugly)
             ok
+    end,
+    ok = enet:stop_host(LocalHost),
+    ok = enet:stop_host(RemoteHost).
+
+broadcast_connect_test(_Config) ->
+    Self = self(),
+    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
+    {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
+    {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
+    {ok, LocalPeer} =
+        enet:connect_peer(LocalHost, "255.255.255.255", RemoteHost, 1),
+    ConnectID =
+        receive
+            {enet, connect, local, {LocalPeer, _LocalChannels}, C} -> C
+        after 1000 ->
+                exit(local_peer_did_not_notify_owner)
+        end,
+    RemotePeer =
+        receive
+            {enet, connect, remote, {P, _RemoteChannels}, ConnectID} -> P
+        after 1000 ->
+                exit(remote_peer_did_not_notify_owner)
+        end,
+    Ref1 = monitor(process, LocalPeer),
+    Ref2 = monitor(process, RemotePeer),
+    ok = enet:disconnect_peer(LocalPeer),
+    receive
+        {enet, disconnected, local, LocalPeer, ConnectID} -> ok
+    after 1000 ->
+            exit(local_peer_did_not_notify_owner)
+    end,
+    receive
+        {enet, disconnected, remote, RemotePeer, ConnectID} -> ok
+    after 1000 ->
+            exit(remote_peer_did_not_notify_owner)
+    end,
+    receive
+        {'DOWN', Ref1, process, LocalPeer, normal} -> ok
+    after 1000 ->
+            exit(local_peer_did_not_exit)
+    end,
+    receive
+        {'DOWN', Ref2, process, RemotePeer, normal} -> ok
+    after 1000 ->
+            exit(remote_peer_did_not_exit)
     end,
     ok = enet:stop_host(LocalHost),
     ok = enet:stop_host(RemoteHost).
