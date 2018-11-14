@@ -18,6 +18,8 @@ channels() = #{ non_neg_integer() := pid() }
 ```
 
 ### Functions
+
+#### start_host/3
 ```erlang
 start_host(Port, ConnectFun, Options) -> {ok, port_number()} | {error, atom()}
 
@@ -34,6 +36,7 @@ start_host(Port, ConnectFun, Options) -> {ok, port_number()} | {error, atom()}
 ```
 Start a new host. If `Port` set to `0`, the port will be dynamically assigned by the underlying operating system. The assigned port is returned.
 
+#### stop_host/1
 ```erlang
 stop_host(Port) -> ok
 
@@ -41,6 +44,7 @@ stop_host(Port) -> ok
 ```
 Stop a host listening on `Port`.
 
+#### connect_peer/4
 ```erlang
 connect_peer(HostPort, IP, RemotePort, ChannelCount) -> {ok, Peer} | {error, atom()}
 
@@ -52,6 +56,7 @@ connect_peer(HostPort, IP, RemotePort, ChannelCount) -> {ok, Peer} | {error, ato
 ```
 Start a new peer on the host listening on `HostPort` connecting to a remote host on address `IP:RemotePort`. The peer process will call `ConnectFun` (given to start_host/3) when initiating the handshake. If a successful connect handshake has been completed, the pid returned by `ConnectFun` will receive a message `{enet, connect, local, {Host, Channels}, ConnectID}`.
 
+#### disconnect_peer/1
 ```erlang
 disconnect_peer(Peer) -> ok
 
@@ -59,6 +64,7 @@ disconnect_peer(Peer) -> ok
 ```
 Disconnect `Peer`.
 
+#### disconnect_peer_now/1
 ```erlang
 disconnect_peer_now(Peer) -> ok
 
@@ -66,6 +72,7 @@ disconnect_peer_now(Peer) -> ok
 ```
 Disconnect `Peer` immediately without waiting for an ACK from the remote peer.
 
+#### send_unsequenced/2
 ```erlang
 send_unsequenced(Channel, Data) -> ok
 
@@ -74,6 +81,7 @@ send_unsequenced(Channel, Data) -> ok
 ```
 Send *unsequenced* data to the remote peer over `Channel`.
 
+#### send_unreliable/2
 ```erlang
 send_unreliable(Channel, Data) -> ok
 
@@ -82,6 +90,7 @@ send_unreliable(Channel, Data) -> ok
 ```
 Send *unreliable* data to the remote peer over `Channel`.
 
+#### send_reliable/2
 ```erlang
 send_reliable(Channel, Data) -> ok
 
@@ -90,6 +99,7 @@ send_reliable(Channel, Data) -> ok
 ```
 Send *reliable* data to the remote peer over `Channel`.
 
+#### broadcast_unsequenced/3
 ```erlang
 broadcast_unsequenced(HostPort, ChannelID, Data) -> ok
 
@@ -99,6 +109,7 @@ broadcast_unsequenced(HostPort, ChannelID, Data) -> ok
 ```
 Broadcast *unsequenced* data to all peers connected to `HostPort` on `ChannelID`.
 
+#### broadcast_unreliable/3
 ```erlang
 broadcast_unreliable(HostPort, ChannelID, Data) -> ok
 
@@ -108,6 +119,7 @@ broadcast_unreliable(HostPort, ChannelID, Data) -> ok
 ```
 Broadcast *unreliable* data to all peers connected to `HostPort` on `ChannelID`.
 
+#### broadcast_reliable/3
 ```erlang
 broadcast_reliable(HostPort, ChannelID, Data) -> ok
 
