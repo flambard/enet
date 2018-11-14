@@ -171,7 +171,7 @@ init([LocalPort, P = #enet_peer{ handshake_flow = local }]) ->
     enet_pool:connect_worker(LocalPort, Ref),
     gproc:reg({p, l, worker_name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
-    case ConnectFun(#{ip => IP, port => Port}) of
+    case start_worker(ConnectFun, #{ip => IP, port => Port}) of
         {error, Reason} ->
             {stop, {worker_init_error, Reason}};
         {ok, Owner} ->
@@ -207,7 +207,7 @@ init([LocalPort, P = #enet_peer{ handshake_flow = remote }]) ->
     enet_pool:connect_worker(LocalPort, Ref),
     gproc:reg({p, l, worker_name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
-    case ConnectFun(#{ip => IP, port => Port}) of
+    case start_worker(ConnectFun, #{ip => IP, port => Port}) of
         {error, Reason} ->
             {error, {worker_init_error, Reason}};
         {ok, Owner} ->
@@ -933,3 +933,8 @@ reset_recv_timer() ->
 
 reset_send_timer() ->
     {{timeout, send}, ?PEER_PING_INTERVAL, ping}.
+
+start_worker({Module, Fun, Args}, PeerInfo) ->
+    erlang:apply(Module, Fun, Args ++ [PeerInfo]);
+start_worker(ConnectFun, PeerInfo) ->
+    ConnectFun(PeerInfo).

@@ -23,9 +23,10 @@
 %%%===================================================================
 
 -spec start_host(Port :: port_number(),
-                 ConnectFun :: fun((map()) -> {ok, pid()} | {error, term()}),
+                 ConnectFun :: mfa()
+                             | fun((map()) -> {ok, pid()} | {error, term()}),
                  Options :: [{atom(), term()}]) ->
-                        {ok, port_number()} | {error, atom()}.
+                        {ok, port_number()} | {error, term()}.
 
 start_host(Port, ConnectFun, Options) ->
     {ok, Socket} = gen_udp:open(Port, enet_host:socket_options()),

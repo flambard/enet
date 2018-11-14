@@ -21,10 +21,10 @@ channels() = #{ non_neg_integer() := pid() }
 
 #### start_host/3
 ```erlang
-start_host(Port, ConnectFun, Options) -> {ok, port_number()} | {error, atom()}
+start_host(Port, ConnectFun, Options) -> {ok, port_number()} | {error, term()}
 
     Port = port_number()
-    ConnectFun = fun((PeerInfo) -> ConnectFunResult)
+    ConnectFun = mfa() | fun((PeerInfo) -> ConnectFunResult)
     PeerInfo = map()
     ConnectFunResult = {ok, pid()} | {error, term()}
     Options = [Option]
@@ -35,6 +35,8 @@ start_host(Port, ConnectFun, Options) -> {ok, port_number()} | {error, atom()}
       {outgoing_bandwidth, bytes_per_second()}
 ```
 Start a new host. If `Port` set to `0`, the port will be dynamically assigned by the underlying operating system. The assigned port is returned.
+
+The `ConnectFun` function or MFA tuple will be called when a new peer has started and a connection to a remote peer has been established. This function is expected to spawn a new process and return a pid to which all messages from the new peer will be sent.
 
 #### stop_host/1
 ```erlang

@@ -12,7 +12,8 @@
         ]).
 
 -export([
-         connect_fun/0,
+         mock_connect_fun/0,
+         mock_start_worker/2,
          pretty_print_commands/1
         ]).
 
@@ -53,13 +54,13 @@ initial_state() ->
 %%%
 
 command(#state{ hosts = [] }) ->
-    {call, enet, start_host, [0, symbolic_connect_fun(), host_options()]};
+    {call, enet, start_host, [0, connect_fun(), host_options()]};
 
 command(S) ->
     Peers = [P || H <- S#state.hosts, P <- H#host.peers],
     oneof(
       [
-       {call, enet, start_host, [0, symbolic_connect_fun(), host_options()]},
+       {call, enet, start_host, [0, connect_fun(), host_options()]},
 
        ?LET(#host{ port = Port }, started_host(S),
             {call, enet_sync, stop_host, [Port]}),
@@ -337,15 +338,24 @@ prop_sync_loopback() ->
 %%% Generators
 %%%
 
-busy_host_port(S = #state{}) ->
-    ?LET(#host{ port = Port }, started_host(S), Port).
+connect_fun() ->
+    oneof([symbolic_connect_fun(), connect_mfa()]).
 
 symbolic_connect_fun() ->
-    {call, enet_model, connect_fun, []}.
+    {call, enet_model, mock_connect_fun, []}.
 
-connect_fun() ->
+connect_mfa() ->
+    {enet_model, mock_start_worker, [{call, erlang, self, []}]}.
+
+mock_connect_fun() ->
     Self = self(),
     fun(_PeerInfo) -> {ok, Self} end.
+
+mock_start_worker(Self, _PeerInfo) ->
+    {ok, Self}.
+
+busy_host_port(S = #state{}) ->
+    ?LET(#host{ port = Port }, started_host(S), Port).
 
 host_options() ->
     [{peer_limit, integer(1, 255)}, {channel_limit, integer(1, 8)}].
