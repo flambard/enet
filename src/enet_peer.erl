@@ -16,7 +16,7 @@
          send_command/2,
          get_connect_id/1,
          get_mtu/1,
-         get_worker_name/1,
+         get_name/1,
          get_peer_id/1
         ]).
 
@@ -141,8 +141,8 @@ get_connect_id(Peer) ->
 get_mtu(Peer) ->
     gproc:get_value({p, l, mtu}, Peer).
 
-get_worker_name(Peer) ->
-    gproc:get_value({p, l, worker_name}, Peer).
+get_name(Peer) ->
+    gproc:get_value({p, l, name}, Peer).
 
 get_peer_id(Peer) ->
     gproc:get_value({p, l, peer_id}, Peer).
@@ -163,13 +163,14 @@ init([LocalPort, P = #enet_peer{ handshake_flow = local }]) ->
        peer_id = PeerID,
        ip = IP,
        port = Port,
-       worker_name = Ref,
+       name = Ref,
        host = Host,
        channels = N,
        connect_fun = ConnectFun
       } = P,
     enet_pool:connect_worker(LocalPort, Ref),
-    gproc:reg({p, l, worker_name}, Ref),
+    gproc:reg({n, l, {enet_peer, Ref}}),
+    gproc:reg({p, l, name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
     case start_worker(ConnectFun, #{ip => IP, port => Port}) of
         {error, Reason} ->
@@ -200,12 +201,13 @@ init([LocalPort, P = #enet_peer{ handshake_flow = remote }]) ->
        peer_id = PeerID,
        ip = IP,
        port = Port,
-       worker_name = Ref,
+       name = Ref,
        host = Host,
        connect_fun = ConnectFun
       } = P,
     enet_pool:connect_worker(LocalPort, Ref),
-    gproc:reg({p, l, worker_name}, Ref),
+    gproc:reg({n, l, {enet_peer, Ref}}),
+    gproc:reg({p, l, name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
     case start_worker(ConnectFun, #{ip => IP, port => Port}) of
         {error, Reason} ->
@@ -842,7 +844,7 @@ disconnecting(EventType, EventContent, S) ->
 %%%
 
 terminate(_Reason, _StateName, #state{ local_port = LocalPort }) ->
-    Name = get_worker_name(self()),
+    Name = get_name(self()),
     enet_pool:disconnect_worker(LocalPort, Name),
     ok.
 

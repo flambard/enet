@@ -116,6 +116,6 @@ send_reliable(Channel, Data) ->
 
 
 gproc_pool_key(Pid) ->
-    WorkerName = enet_peer:get_worker_name(Pid),
+    Name = enet_peer:get_name(Pid),
     PeerID = enet_peer:get_peer_id(Pid),
-    {n, l, [gproc_pool, PeerID, WorkerName]}.
+    {n, l, [gproc_pool, PeerID, Name]}.

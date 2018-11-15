@@ -4,7 +4,7 @@
          peer_id,
          ip,
          port,
-         worker_name,
+         name,
          host,
          channels,
          connect_fun

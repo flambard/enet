@@ -147,7 +147,7 @@ handle_call({connect, IP, Port, Channels}, _From, S) ->
                           peer_id = PeerID,
                           ip = IP,
                           port = Port,
-                          worker_name = Ref,
+                          name = Ref,
                           host = self(),
                           channels = Channels,
                           connect_fun = ConnectFun
@@ -238,7 +238,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                               peer_id = PeerID,
                               ip = IP,
                               port = Port,
-                              worker_name = Ref,
+                              name = Ref,
                               host = self(),
                               connect_fun = ConnectFun
                              },
@@ -262,7 +262,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
     end,
     {noreply, S};
 
-handle_info({gproc, unreg, _Ref, {n, l, {worker, Ref}}}, S) ->
+handle_info({gproc, unreg, _Ref, {n, l, {enet_peer, Ref}}}, S) ->
     %%
     %% A Peer process has exited.
     %%
@@ -296,13 +296,12 @@ code_change(_OldVsn, State, _Extra) ->
 get_time() ->
     erlang:system_time(1000) band 16#FFFF.
 
-start_peer(Peer = #enet_peer{ worker_name = Ref }) ->
+start_peer(Peer = #enet_peer{ name = Ref }) ->
     LocalPort = gproc:get_value({p, l, port}, self()),
     PeerSup = gproc:where({n, l, {enet_peer_sup, LocalPort}}),
     case enet_peer_sup:start_peer(PeerSup, Peer) of
         {error, Reason} -> {error, Reason};
         {ok, Pid} ->
-            true = gproc:reg_other({n, l, {worker, Ref}}, Pid),
-            _Ref = gproc:monitor({n, l, {worker, Ref}}),
+            _Ref = gproc:monitor({n, l, {enet_peer, Ref}}),
             {ok, Pid}
     end.
