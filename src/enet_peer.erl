@@ -168,7 +168,7 @@ init([LocalPort, P = #enet_peer{ handshake_flow = local }]) ->
        channels = N,
        connect_fun = ConnectFun
       } = P,
-    enet_pool:connect_worker(LocalPort, Ref),
+    enet_pool:connect_peer(LocalPort, Ref),
     gproc:reg({n, l, {enet_peer, Ref}}),
     gproc:reg({p, l, name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
@@ -205,7 +205,7 @@ init([LocalPort, P = #enet_peer{ handshake_flow = remote }]) ->
        host = Host,
        connect_fun = ConnectFun
       } = P,
-    enet_pool:connect_worker(LocalPort, Ref),
+    enet_pool:connect_peer(LocalPort, Ref),
     gproc:reg({n, l, {enet_peer, Ref}}),
     gproc:reg({p, l, name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
@@ -845,7 +845,7 @@ disconnecting(EventType, EventContent, S) ->
 
 terminate(_Reason, _StateName, #state{ local_port = LocalPort }) ->
     Name = get_name(self()),
-    enet_pool:disconnect_worker(LocalPort, Name),
+    enet_pool:disconnect_peer(LocalPort, Name),
     ok.
 
 

@@ -123,9 +123,9 @@ broadcast_reliable(HostPort, ChannelID, Data) ->
 %%%===================================================================
 
 broadcast(HostPort, ChannelID, Data, SendFun) ->
-    Workers = enet_pool:active_workers(HostPort),
+    Peers = enet_pool:active_peers(HostPort),
     lists:foreach(fun ({_Name, Peer}) ->
                           Channel = enet_peer:channel(Peer, ChannelID),
                           SendFun(Channel, Data)
                   end,
-                  Workers).
+                  Peers).

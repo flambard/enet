@@ -131,7 +131,7 @@ handle_call({connect, IP, Port, Channels}, _From, S) ->
     %%
     %% Connect to a remote peer.
     %%
-    %% - Add a worker to the pool
+    %% - Add a peer to the pool
     %% - Start the peer process
     %%
     #state{
@@ -140,7 +140,7 @@ handle_call({connect, IP, Port, Channels}, _From, S) ->
     Ref = make_ref(),
     LocalPort = get_port(self()),
     Reply =
-        try enet_pool:add_worker(LocalPort, Ref) of
+        try enet_pool:add_peer(LocalPort, Ref) of
             PeerID ->
                 Peer = #enet_peer{
                           handshake_flow = local,
@@ -155,7 +155,7 @@ handle_call({connect, IP, Port, Channels}, _From, S) ->
                 case start_peer(Peer) of
                     {ok, Pid}       -> {ok, Pid};
                     {error, Reason} ->
-                        true = enet_pool:remove_worker(LocalPort, Ref),
+                        true = enet_pool:remove_peer(LocalPort, Ref),
                         {error, Reason}
                 end
         catch
@@ -231,7 +231,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
             %% No particular peer is the receiver of this packet.
             %% Create a new peer.
             Ref = make_ref(),
-            try enet_pool:add_worker(LocalPort, Ref) of
+            try enet_pool:add_peer(LocalPort, Ref) of
                 PeerID ->
                     Peer = #enet_peer{
                               handshake_flow = remote,
@@ -244,7 +244,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                              },
                     case start_peer(Peer) of
                         {error, _Reason} ->
-                            true = enet_pool:remove_worker(LocalPort, Ref);
+                            true = enet_pool:remove_peer(LocalPort, Ref);
                         {ok, Pid} ->
                             ok = enet_peer:recv_incoming_packet(
                                    Pid, IP, SentTime, Commands)
@@ -254,7 +254,7 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                 error:exists    -> {error, exists}
             end;
         PeerID ->
-            case enet_pool:pick_worker(LocalPort, PeerID) of
+            case enet_pool:pick_peer(LocalPort, PeerID) of
                 false -> ok; %% Unknown peer - drop the packet
                 Pid ->
                     enet_peer:recv_incoming_packet(Pid, IP, SentTime, Commands)
@@ -266,10 +266,10 @@ handle_info({gproc, unreg, _Ref, {n, l, {enet_peer, Ref}}}, S) ->
     %%
     %% A Peer process has exited.
     %%
-    %% - Remove the worker from the pool
+    %% - Remove it from the pool
     %%
     LocalPort = get_port(self()),
-    true = enet_pool:remove_worker(LocalPort, Ref),
+    true = enet_pool:remove_peer(LocalPort, Ref),
     {noreply, S}.
 
 
