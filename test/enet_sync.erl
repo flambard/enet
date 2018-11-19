@@ -17,10 +17,10 @@ connect(LocalHost, RemotePort, ChannelCount) ->
         {error, reached_peer_limit} -> {error, reached_peer_limit};
         {ok, LPeer} ->
             receive
-                {enet, connect, local, {LPeer, LChannels}, CID} ->
+                #{peer := LP, channels := LCs, connect_id := CID} ->
                     receive
-                        {enet, connect, remote, {RPeer, RChannels}, CID} ->
-                            {LPeer, LChannels, RPeer, RChannels}
+                        #{peer := RP, channels := RCs, connect_id := CID} ->
+                            {LP, LCs, RP, RCs}
                     after 1000 ->
                             {error, remote_timeout}
                     end

@@ -40,9 +40,6 @@
 
 -record(state,
         {
-         worker,
-         host,
-         channels,
          local_port,
          ip,
          port,
@@ -60,7 +57,12 @@
          incoming_unsequenced_group = 0,
          outgoing_unsequenced_group = 1,
          unsequenced_window = 0,
-         connect_id
+         connect_id,
+         host,
+         channel_count,
+         channels,
+         worker,
+         connect_fun
         }).
 
 
@@ -172,23 +174,16 @@ init([LocalPort, P = #enet_peer{ handshake_flow = local }]) ->
     gproc:reg({n, l, {enet_peer, Ref}}),
     gproc:reg({p, l, name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
-    case start_worker(ConnectFun, #{ip => IP, port => Port}) of
-        {error, Reason} ->
-            {stop, {worker_init_error, Reason}};
-        {ok, Worker} ->
-            _Ref = monitor(process, Worker),
-            Channels = start_channels(N, Worker),
-            S = #state{
-                   worker = Worker,
-                   channels = Channels,
-                   host = Host,
-                   local_port = LocalPort,
-                   ip = IP,
-                   port = Port,
-                   peer_id = PeerID
-                  },
-            {ok, connecting, S}
-    end;
+    S = #state{
+           host = Host,
+           local_port = LocalPort,
+           ip = IP,
+           port = Port,
+           peer_id = PeerID,
+           channel_count = N,
+           connect_fun = ConnectFun
+          },
+    {ok, connecting, S};
 
 init([LocalPort, P = #enet_peer{ handshake_flow = remote }]) ->
     %%
@@ -209,21 +204,15 @@ init([LocalPort, P = #enet_peer{ handshake_flow = remote }]) ->
     gproc:reg({n, l, {enet_peer, Ref}}),
     gproc:reg({p, l, name}, Ref),
     gproc:reg({p, l, peer_id}, PeerID),
-    case start_worker(ConnectFun, #{ip => IP, port => Port}) of
-        {error, Reason} ->
-            {error, {worker_init_error, Reason}};
-        {ok, Worker} ->
-            _Ref = monitor(process, Worker),
-            S = #state{
-                   worker = Worker,
-                   host = Host,
-                   local_port = LocalPort,
-                   ip = IP,
-                   port = Port,
-                   peer_id = PeerID
-                  },
-            {ok, acknowledging_connect, S}
-    end.
+    S = #state{
+           host = Host,
+           local_port = LocalPort,
+           ip = IP,
+           port = Port,
+           peer_id = PeerID,
+           connect_fun = ConnectFun
+          },
+    {ok, acknowledging_connect, S}.
 
 
 callback_mode() ->
@@ -240,7 +229,7 @@ connecting(enter, _OldState, S) ->
     %%
     #state{
        host = Host,
-       channels = Channels,
+       channel_count = ChannelCount,
        ip = IP,
        port = Port,
        peer_id = PeerID,
@@ -261,7 +250,7 @@ connecting(enter, _OldState, S) ->
           PeerID,
           IncomingSessionID,
           OutgoingSessionID,
-          maps:size(Channels),
+          ChannelCount,
           MTU,
           IncomingBandwidth,
           OutgoingBandwidth,
@@ -338,7 +327,6 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
        data                         = _Data
       } = C,
     #state{
-       worker = Worker,
        host = Host,
        ip = IP,
        port = Port,
@@ -364,14 +352,13 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
     Data = [HBin, CBin],
     {sent_time, SentTime} =
         enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
-    Channels = start_channels(ChannelCount, Worker),
     ChannelID = 16#FF,
     VerifyConnectTimeout =
         make_resend_timer(
           ChannelID, SentTime, SequenceNr, ?PEER_TIMEOUT_MINIMUM, Data),
     NewS = S#state{
              remote_peer_id = RemotePeerID,
-             channels = Channels,
+             %% channels = Channels,
              connect_id = ConnectID,
              incoming_bandwidth = IncomingBandwidth,
              outgoing_bandwidth = OutgoingBandwidth,
@@ -379,7 +366,8 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
              packet_throttle_interval = PacketThrottleInterval,
              packet_throttle_acceleration = PacketThrottleAcceleration,
              packet_throttle_deceleration = PacketThrottleDeceleration,
-             outgoing_reliable_sequence_number = SequenceNr + 1
+             outgoing_reliable_sequence_number = SequenceNr + 1,
+             channel_count = ChannelCount
             },
     {next_state, verifying_connect, NewS, [VerifyConnectTimeout]};
 
@@ -425,12 +413,10 @@ acknowledging_verify_connect(
     %%
     %% TODO: Calculate and validate Session IDs
     %%
-    #state{ channels = Channels } = S,
-    LocalChannelCount = maps:size(Channels),
+    #state{ channel_count = LocalChannelCount } = S,
     LocalMTU = get_mtu(self()),
     case S of
         #state{
-           worker                        = Worker,
            %% ---
            %% Fields below are matched against the values received in
            %% the Verify Connect command.
@@ -446,7 +432,6 @@ acknowledging_verify_connect(
           } when
               LocalChannelCount =:= RemoteChannelCount,
               LocalMTU =:= RemoteMTU ->
-            Worker ! {enet, connect, local, {self(), Channels}, ConnectID},
             NewS = S#state{ remote_peer_id = RemotePeerID },
             {next_state, connected, NewS};
         _Mismatch ->
@@ -472,12 +457,6 @@ verifying_connect(cast, {incoming_command, {H, C = #acknowledge{}}}, S) ->
     %% - Notify worker that a new peer has been connected
     %% - Change to 'connected' state
     %%
-    #state{
-       worker = Worker,
-       channels = Channels,
-       connect_id = ConnectID
-      } = S,
-    Worker ! {enet, connect, remote, {self(), Channels}, ConnectID},
     #command_header{ channel_id = ChannelID } = H,
     #acknowledge{
        received_reliable_sequence_number = SequenceNumber,
@@ -500,7 +479,9 @@ connected(enter, _OldState, S) ->
        ip = IP,
        port = Port,
        remote_peer_id = RemotePeerID,
-       connect_id = ConnectID
+       connect_id = ConnectID,
+       channel_count = N,
+       connect_fun = ConnectFun
       } = S,
     true = gproc:mreg(p, l, [
                              {connect_id, ConnectID},
@@ -508,9 +489,28 @@ connected(enter, _OldState, S) ->
                              {remote_peer_id, RemotePeerID}
                             ]),
     ok = enet_disconnector:set_trigger(LocalPort, RemotePeerID, IP, Port),
-    SendTimeout = reset_send_timer(),
-    RecvTimeout = reset_recv_timer(),
-    {keep_state, S, [SendTimeout, RecvTimeout]};
+    Channels = start_channels(N),
+    PeerInfo = #{
+                 ip => IP,
+                 port => Port,
+                 peer => self(),
+                 channels => Channels,
+                 connect_id => ConnectID
+                },
+    case start_worker(ConnectFun, PeerInfo) of
+        {error, Reason} ->
+            {stop, {worker_init_error, Reason}, S};
+        {ok, Worker} ->
+            _Ref = monitor(process, Worker),
+            [enet_channel:set_worker(C, Worker) || C <- maps:values(Channels)],
+            NewS = S#state{
+                     channels = Channels,
+                     worker = Worker
+                    },
+            SendTimeout = reset_send_timer(),
+            RecvTimeout = reset_recv_timer(),
+            {keep_state, NewS, [SendTimeout, RecvTimeout]}
+    end;
 
 connected(cast, {incoming_command, {_H, #ping{}}}, S) ->
     %%
@@ -913,12 +913,12 @@ handle_event(info, {'DOWN', _, process, O, _}, S = #state{ worker = O }) ->
     {stop, worker_process_down, S}.
 
 
-start_channels(N, Worker) ->
+start_channels(N) ->
     IDs = lists:seq(0, N-1),
     Channels =
         lists:map(
           fun (ID) ->
-                  {ok, Channel} = enet_channel:start_link(ID, self(), Worker),
+                  {ok, Channel} = enet_channel:start_link(ID, self()),
                   {ID, Channel}
           end,
           IDs),

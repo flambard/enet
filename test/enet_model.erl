@@ -349,9 +349,13 @@ connect_mfa() ->
 
 mock_connect_fun() ->
     Self = self(),
-    fun(_PeerInfo) -> {ok, Self} end.
+    fun(PeerInfo) ->
+            Self ! PeerInfo,
+            {ok, Self}
+    end.
 
-mock_start_worker(Self, _PeerInfo) ->
+mock_start_worker(Self, PeerInfo) ->
+    Self ! PeerInfo,
     {ok, Self}.
 
 busy_host_port(S = #state{}) ->

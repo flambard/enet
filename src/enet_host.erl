@@ -152,12 +152,7 @@ handle_call({connect, IP, Port, Channels}, _From, S) ->
                           channels = Channels,
                           connect_fun = ConnectFun
                          },
-                case start_peer(Peer) of
-                    {ok, Pid}       -> {ok, Pid};
-                    {error, Reason} ->
-                        true = enet_pool:remove_peer(LocalPort, Ref),
-                        {error, Reason}
-                end
+                start_peer(Peer)
         catch
             error:pool_full -> {error, reached_peer_limit};
             error:exists    -> {error, exists}
@@ -242,13 +237,8 @@ handle_info({udp, Socket, IP, Port, Packet}, S) ->
                               host = self(),
                               connect_fun = ConnectFun
                              },
-                    case start_peer(Peer) of
-                        {error, _Reason} ->
-                            true = enet_pool:remove_peer(LocalPort, Ref);
-                        {ok, Pid} ->
-                            ok = enet_peer:recv_incoming_packet(
-                                   Pid, IP, SentTime, Commands)
-                    end
+                    {ok, Pid} = start_peer(Peer),
+                    enet_peer:recv_incoming_packet(Pid, IP, SentTime, Commands)
             catch
                 error:pool_full -> {error, reached_peer_limit};
                 error:exists    -> {error, exists}
@@ -299,9 +289,6 @@ get_time() ->
 start_peer(Peer = #enet_peer{ name = Ref }) ->
     LocalPort = gproc:get_value({p, l, port}, self()),
     PeerSup = gproc:where({n, l, {enet_peer_sup, LocalPort}}),
-    case enet_peer_sup:start_peer(PeerSup, Peer) of
-        {error, Reason} -> {error, Reason};
-        {ok, Pid} ->
-            _Ref = gproc:monitor({n, l, {enet_peer, Ref}}),
-            {ok, Pid}
-    end.
+    {ok, Pid} = enet_peer_sup:start_peer(PeerSup, Peer),
+    _Ref = gproc:monitor({n, l, {enet_peer, Ref}}),
+    {ok, Pid}.

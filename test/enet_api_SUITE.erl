@@ -51,8 +51,13 @@ local_worker_init_error_test(_Config) ->
     ConnectFun = fun(_PeerInfo) -> {error, whatever} end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
-    {error, {worker_init_error, whatever}} =
-        enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
+    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
+    Ref = monitor(process, LocalPeer),
+    receive
+        {'DOWN', Ref, process, LocalPeer, {worker_init_error, whatever}} -> ok
+    after 1000 ->
+            exit(local_peer_did_not_stop_on_worker_init_error)
+    end,
     ok = enet:stop_host(LocalHost),
     ok = enet:stop_host(RemoteHost).
 
@@ -68,15 +73,16 @@ local_zero_peer_limit_test(_Config) ->
 
 remote_zero_peer_limit_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
+    ConnectFun = fun(PeerInfo) ->
+                         Self ! PeerInfo,
+                         {ok, Self}
+                 end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 0}]),
-    {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
+    {ok, Peer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     receive
-        {enet, connect, local, {LocalPeer, _LocalChannels}, _ConnectID} ->
-            exit(peer_could_connect_despite_peer_limit_reached);
-        {enet, connect, remote, _RemotePeer, _ConnectID} ->
-            exit(remote_peer_started_despite_peer_limit_reached)
+        #{peer := Peer} ->
+            exit(peer_could_connect_despite_peer_limit_reached)
     after 200 -> %% How long time is enough? (This is ugly)
             ok
     end,
@@ -85,20 +91,23 @@ remote_zero_peer_limit_test(_Config) ->
 
 broadcast_connect_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
+    ConnectFun = fun(PeerInfo) ->
+                         Self ! PeerInfo,
+                         {ok, Self}
+                 end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 1}]),
     {ok, LocalPeer} =
         enet:connect_peer(LocalHost, "255.255.255.255", RemoteHost, 1),
     ConnectID =
         receive
-            {enet, connect, local, {LocalPeer, _LocalChannels}, C} -> C
+            #{peer := LocalPeer, connect_id := C} -> C
         after 1000 ->
                 exit(local_peer_did_not_notify_worker)
         end,
     RemotePeer =
         receive
-            {enet, connect, remote, {P, _RemoteChannels}, ConnectID} -> P
+            #{peer := P, connect_id := ConnectID} -> P
         after 1000 ->
                 exit(remote_peer_did_not_notify_worker)
         end,
@@ -130,19 +139,22 @@ broadcast_connect_test(_Config) ->
 
 local_disconnect_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
+    ConnectFun = fun(PeerInfo) ->
+                         Self ! PeerInfo,
+                         {ok, Self}
+                 end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     ConnectID =
         receive
-            {enet, connect, local, {LocalPeer, _LocalChannels}, C} -> C
+            #{peer := LocalPeer, connect_id := C} -> C
         after 1000 ->
                 exit(local_peer_did_not_notify_worker)
         end,
     RemotePeer =
         receive
-            {enet, connect, remote, {P, _RemoteChannels}, ConnectID} -> P
+            #{peer := P, connect_id := ConnectID} -> P
         after 1000 ->
                 exit(remote_peer_did_not_notify_worker)
         end,
@@ -174,19 +186,22 @@ local_disconnect_test(_Config) ->
 
 remote_disconnect_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
+    ConnectFun = fun(PeerInfo) ->
+                         Self ! PeerInfo,
+                         {ok, Self}
+                 end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     ConnectID =
         receive
-            {enet, connect, local, {LocalPeer, _LocalChannels}, C} -> C
+            #{peer := LocalPeer, connect_id := C} -> C
         after 1000 ->
                 exit(local_peer_did_not_notify_worker)
         end,
     RemotePeer =
         receive
-            {enet, connect, remote, {P, _RemoteChannels}, ConnectID} -> P
+            #{peer := P, connect_id := ConnectID} -> P
         after 1000 ->
                 exit(remote_peer_did_not_notify_worker)
         end,
@@ -218,19 +233,22 @@ remote_disconnect_test(_Config) ->
 
 unsequenced_messages_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
+    ConnectFun = fun(PeerInfo) ->
+                         Self ! PeerInfo,
+                         {ok, Self}
+                 end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     {ConnectID, LocalChannels} =
         receive
-            {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
+            #{peer := LocalPeer, channels := LCs, connect_id := C} -> {C, LCs}
         after 1000 ->
                 exit(local_peer_did_not_notify_worker)
         end,
-    {_RemotePeer, RemoteChannels} =
+    RemoteChannels =
         receive
-            {enet, connect, remote, PC, ConnectID} -> PC
+            #{channels := RCs, connect_id := ConnectID} -> RCs
         after 1000 ->
                 exit(remote_peer_did_not_notify_worker)
         end,
@@ -253,19 +271,22 @@ unsequenced_messages_test(_Config) ->
 
 unreliable_messages_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
+    ConnectFun = fun(PeerInfo) ->
+                         Self ! PeerInfo,
+                         {ok, Self}
+                 end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     {ConnectID, LocalChannels} =
         receive
-            {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
+            #{peer := LocalPeer, channels := LCs, connect_id := C} -> {C, LCs}
         after 1000 ->
                 exit(local_peer_did_not_notify_worker)
         end,
-    {_RemotePeer, RemoteChannels} =
+    RemoteChannels =
         receive
-            {enet, connect, remote, PC, ConnectID} -> PC
+            #{channels := RCs, connect_id := ConnectID} -> RCs
         after 1000 ->
                 exit(remote_peer_did_not_notify_worker)
         end,
@@ -300,19 +321,22 @@ unreliable_messages_test(_Config) ->
 
 reliable_messages_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
+    ConnectFun = fun(PeerInfo) ->
+                         Self ! PeerInfo,
+                         {ok, Self}
+                 end,
     {ok, LocalHost}  = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, RemoteHost} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, LocalPeer} = enet:connect_peer(LocalHost, "127.0.0.1", RemoteHost, 1),
     {ConnectID, LocalChannels} =
         receive
-            {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
+            #{peer := LocalPeer, channels := LCs, connect_id := C} -> {C, LCs}
         after 1000 ->
                 exit(local_peer_did_not_notify_worker)
         end,
-    {_RemotePeer, RemoteChannels} =
+    RemoteChannels =
         receive
-            {enet, connect, remote, PC, ConnectID} -> PC
+            #{channels := RCs, connect_id := ConnectID} -> RCs
         after 1000 ->
                 exit(remote_peer_did_not_notify_worker)
         end,
@@ -347,43 +371,46 @@ reliable_messages_test(_Config) ->
 
 unsequenced_broadcast_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
+    ConnectFun = fun(PeerInfo) ->
+                         Self ! PeerInfo,
+                         {ok, Self}
+                 end,
     {ok, Host1} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host2} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host3} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Peer12} = enet:connect_peer(Host1, "127.0.0.1", Host2, 1),
     ConnectID12 =
         receive
-            {enet, connect, local, {Peer12, _Cs12}, CID12} -> CID12
+            #{peer := Peer12, connect_id := CID12} -> CID12
         after 1000 ->
                 exit(peer12_did_not_notify_worker)
         end,
     receive
-        {enet, connect, remote, {_P21, _Cs21}, ConnectID12} -> ok
+        #{connect_id := ConnectID12} -> ok
     after 1000 ->
             exit(peer21_did_not_notify_worker)
     end,
     {ok, Peer23} = enet:connect_peer(Host2, "127.0.0.1", Host3, 1),
     ConnectID23 =
         receive
-            {enet, connect, local, {Peer23, _Cs23}, CID23} -> CID23
+            #{peer := Peer23, connect_id := CID23} -> CID23
         after 1000 ->
                 exit(peer23_did_not_notify_worker)
         end,
     receive
-        {enet, connect, remote, {_P32, _Cs32}, ConnectID23} -> ok
+        #{connect_id := ConnectID23} -> ok
     after 1000 ->
             exit(peer32_did_not_notify_worker)
     end,
     {ok, Peer31} = enet:connect_peer(Host3, "127.0.0.1", Host1, 1),
     ConnectID31 =
         receive
-            {enet, connect, local, {Peer31, _Cs31}, CID31} -> CID31
+            #{peer := Peer31, connect_id := CID31} -> CID31
         after 1000 ->
                 exit(peer31_did_not_notify_worker)
         end,
     receive
-        {enet, connect, remote, {_P13, _Cs13}, ConnectID31} -> ok
+        #{connect_id := ConnectID31} -> ok
     after 1000 ->
             exit(peer13_did_not_notify_worker)
     end,
@@ -426,43 +453,46 @@ unsequenced_broadcast_test(_Config) ->
 
 unreliable_broadcast_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
+    ConnectFun = fun(PeerInfo) ->
+                         Self ! PeerInfo,
+                         {ok, Self}
+                 end,
     {ok, Host1} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host2} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host3} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Peer12} = enet:connect_peer(Host1, "127.0.0.1", Host2, 1),
     ConnectID12 =
         receive
-            {enet, connect, local, {Peer12, _Cs12}, CID12} -> CID12
+            #{peer := Peer12, connect_id := CID12} -> CID12
         after 1000 ->
                 exit(peer12_did_not_notify_worker)
         end,
     receive
-        {enet, connect, remote, {_P21, _Cs21}, ConnectID12} -> ok
+        #{connect_id := ConnectID12} -> ok
     after 1000 ->
             exit(peer21_did_not_notify_worker)
     end,
     {ok, Peer23} = enet:connect_peer(Host2, "127.0.0.1", Host3, 1),
     ConnectID23 =
         receive
-            {enet, connect, local, {Peer23, _Cs23}, CID23} -> CID23
+            #{peer := Peer23, connect_id := CID23} -> CID23
         after 1000 ->
                 exit(peer23_did_not_notify_worker)
         end,
     receive
-        {enet, connect, remote, {_P32, _Cs32}, ConnectID23} -> ok
+        #{connect_id := ConnectID23} -> ok
     after 1000 ->
             exit(peer32_did_not_notify_worker)
     end,
     {ok, Peer31} = enet:connect_peer(Host3, "127.0.0.1", Host1, 1),
     ConnectID31 =
         receive
-            {enet, connect, local, {Peer31, _Cs31}, CID31} -> CID31
+            #{peer := Peer31, connect_id := CID31} -> CID31
         after 1000 ->
                 exit(peer31_did_not_notify_worker)
         end,
     receive
-        {enet, connect, remote, {_P13, _Cs13}, ConnectID31} -> ok
+        #{connect_id := ConnectID31} -> ok
     after 1000 ->
             exit(peer13_did_not_notify_worker)
     end,
@@ -505,43 +535,47 @@ unreliable_broadcast_test(_Config) ->
 
 reliable_broadcast_test(_Config) ->
     Self = self(),
-    ConnectFun = fun(_PeerInfo) -> {ok, Self} end,
+    ConnectFun = fun(PeerInfo) ->
+                         Self ! PeerInfo,
+                         {ok, Self}
+                 end,
     {ok, Host1} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host2} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Host3} = enet:start_host(0, ConnectFun, [{peer_limit, 8}]),
     {ok, Peer12} = enet:connect_peer(Host1, "127.0.0.1", Host2, 1),
     ConnectID12 =
         receive
-            {enet, connect, local, {Peer12, _Cs12}, CID12} -> CID12
+            #{peer := Peer12, connect_id := CID12} -> CID12
         after 1000 ->
                 exit(peer12_did_not_notify_worker)
         end,
     receive
-        {enet, connect, remote, {_P21, _Cs21}, ConnectID12} -> ok
+        #{connect_id := ConnectID12} -> ok
     after 1000 ->
             exit(peer21_did_not_notify_worker)
     end,
     {ok, Peer23} = enet:connect_peer(Host2, "127.0.0.1", Host3, 1),
     ConnectID23 =
         receive
-            {enet, connect, local, {Peer23, _Cs23}, CID23} -> CID23
+            #{peer := Peer23, connect_id := CID23} -> CID23
         after 1000 ->
                 exit(peer23_did_not_notify_worker)
         end,
     receive
-        {enet, connect, remote, {_P32, _Cs32}, ConnectID23} -> ok
+        #{connect_id := ConnectID23} -> ok
     after 1000 ->
             exit(peer32_did_not_notify_worker)
     end,
     {ok, Peer31} = enet:connect_peer(Host3, "127.0.0.1", Host1, 1),
     ConnectID31 =
         receive
-            {enet, connect, local, {Peer31, _Cs31}, CID31} -> CID31
+            #{peer := Peer31, connect_id := CID31} -> CID31
         after 1000 ->
                 exit(peer31_did_not_notify_worker)
         end,
     receive
-        {enet, connect, remote, {_P13, _Cs13}, ConnectID31} -> ok
+        #{connect_id := ConnectID31} -> ok
+
     after 1000 ->
             exit(peer13_did_not_notify_worker)
     end,

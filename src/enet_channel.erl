@@ -3,8 +3,9 @@
 -include("enet_commands.hrl").
 
 -export([
-         start_link/3,
+         start_link/2,
          stop/1,
+         set_worker/2,
          recv_unsequenced/2,
          send_unsequenced/2,
          recv_unreliable/2,
@@ -14,7 +15,7 @@
         ]).
 
 -export([
-         init/4
+         init/3
         ]).
 
 -export([
@@ -44,11 +45,14 @@
 %%% API
 %%%
 
-start_link(ID, Peer, Worker) ->
-    proc_lib:start_link(?MODULE, init, [ID, Peer, Worker, self()]).
+start_link(ID, Peer) ->
+    proc_lib:start_link(?MODULE, init, [ID, Peer, self()]).
 
 stop(Channel) ->
     Channel ! stop.
+
+set_worker(Channel, Worker) ->
+    Channel ! {set_worker, Worker}.
 
 recv_unsequenced(Channel, {H, C}) ->
     %% Peer -> Channel -> Worker
@@ -85,17 +89,22 @@ send_reliable(Channel, Data) ->
 %%% Implementation
 %%%
 
-init(ID, Peer, Worker, Parent) ->
+init(ID, Peer, Parent) ->
     Debug = sys:debug_options([]),
     State = #state{
                id = ID,
                peer = Peer,
-               worker = Worker,
                sys_parent = Parent,
                sys_debug = Debug
               },
     proc_lib:init_ack(Parent, {ok, self()}),
-    loop(State).
+    await_worker(State).
+
+
+await_worker(S) ->
+    receive
+        {set_worker, Worker} -> loop(S#state{ worker = Worker })
+    end.
 
 
 loop(S = #state{ id = ID, peer = Peer, worker = Worker }) ->
