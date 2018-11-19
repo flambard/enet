@@ -94,13 +94,13 @@ broadcast_connect_test(_Config) ->
         receive
             {enet, connect, local, {LocalPeer, _LocalChannels}, C} -> C
         after 1000 ->
-                exit(local_peer_did_not_notify_owner)
+                exit(local_peer_did_not_notify_worker)
         end,
     RemotePeer =
         receive
             {enet, connect, remote, {P, _RemoteChannels}, ConnectID} -> P
         after 1000 ->
-                exit(remote_peer_did_not_notify_owner)
+                exit(remote_peer_did_not_notify_worker)
         end,
     Ref1 = monitor(process, LocalPeer),
     Ref2 = monitor(process, RemotePeer),
@@ -108,12 +108,12 @@ broadcast_connect_test(_Config) ->
     receive
         {enet, disconnected, local, LocalPeer, ConnectID} -> ok
     after 1000 ->
-            exit(local_peer_did_not_notify_owner)
+            exit(local_peer_did_not_notify_worker)
     end,
     receive
         {enet, disconnected, remote, RemotePeer, ConnectID} -> ok
     after 1000 ->
-            exit(remote_peer_did_not_notify_owner)
+            exit(remote_peer_did_not_notify_worker)
     end,
     receive
         {'DOWN', Ref1, process, LocalPeer, normal} -> ok
@@ -138,13 +138,13 @@ local_disconnect_test(_Config) ->
         receive
             {enet, connect, local, {LocalPeer, _LocalChannels}, C} -> C
         after 1000 ->
-                exit(local_peer_did_not_notify_owner)
+                exit(local_peer_did_not_notify_worker)
         end,
     RemotePeer =
         receive
             {enet, connect, remote, {P, _RemoteChannels}, ConnectID} -> P
         after 1000 ->
-                exit(remote_peer_did_not_notify_owner)
+                exit(remote_peer_did_not_notify_worker)
         end,
     Ref1 = monitor(process, LocalPeer),
     Ref2 = monitor(process, RemotePeer),
@@ -152,12 +152,12 @@ local_disconnect_test(_Config) ->
     receive
         {enet, disconnected, local, LocalPeer, ConnectID} -> ok
     after 1000 ->
-            exit(local_peer_did_not_notify_owner)
+            exit(local_peer_did_not_notify_worker)
     end,
     receive
         {enet, disconnected, remote, RemotePeer, ConnectID} -> ok
     after 1000 ->
-            exit(remote_peer_did_not_notify_owner)
+            exit(remote_peer_did_not_notify_worker)
     end,
     receive
         {'DOWN', Ref1, process, LocalPeer, normal} -> ok
@@ -182,13 +182,13 @@ remote_disconnect_test(_Config) ->
         receive
             {enet, connect, local, {LocalPeer, _LocalChannels}, C} -> C
         after 1000 ->
-                exit(local_peer_did_not_notify_owner)
+                exit(local_peer_did_not_notify_worker)
         end,
     RemotePeer =
         receive
             {enet, connect, remote, {P, _RemoteChannels}, ConnectID} -> P
         after 1000 ->
-                exit(remote_peer_did_not_notify_owner)
+                exit(remote_peer_did_not_notify_worker)
         end,
     Ref1 = monitor(process, LocalPeer),
     Ref2 = monitor(process, RemotePeer),
@@ -196,12 +196,12 @@ remote_disconnect_test(_Config) ->
     receive
         {enet, disconnected, local, _LocalPeer, ConnectID} -> ok
     after 1000 ->
-            exit(local_peer_did_not_notify_owner)
+            exit(local_peer_did_not_notify_worker)
     end,
     receive
         {enet, disconnected, remote, _RemotePeer, ConnectID} -> ok
     after 1000 ->
-            exit(remote_peer_did_not_notify_owner)
+            exit(remote_peer_did_not_notify_worker)
     end,
     receive
         {'DOWN', Ref1, process, LocalPeer, normal} -> ok
@@ -226,13 +226,13 @@ unsequenced_messages_test(_Config) ->
         receive
             {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
         after 1000 ->
-                exit(local_peer_did_not_notify_owner)
+                exit(local_peer_did_not_notify_worker)
         end,
     {_RemotePeer, RemoteChannels} =
         receive
             {enet, connect, remote, PC, ConnectID} -> PC
         after 1000 ->
-                exit(remote_peer_did_not_notify_owner)
+                exit(remote_peer_did_not_notify_worker)
         end,
     {ok, LocalChannel1}  = maps:find(0, LocalChannels),
     {ok, RemoteChannel1} = maps:find(0, RemoteChannels),
@@ -241,12 +241,12 @@ unsequenced_messages_test(_Config) ->
     receive
         {enet, 0, #unsequenced{ data = <<"local->remote">> }} -> ok
     after 500 ->
-            exit(remote_channel_did_not_send_data_to_owner)
+            exit(remote_channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unsequenced{ data = <<"remote->local">> }} -> ok
     after 500 ->
-            exit(local_channel_did_not_send_data_to_owner)
+            exit(local_channel_did_not_send_data_to_worker)
     end,
     ok = enet:stop_host(LocalHost),
     ok = enet:stop_host(RemoteHost).
@@ -261,13 +261,13 @@ unreliable_messages_test(_Config) ->
         receive
             {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
         after 1000 ->
-                exit(local_peer_did_not_notify_owner)
+                exit(local_peer_did_not_notify_worker)
         end,
     {_RemotePeer, RemoteChannels} =
         receive
             {enet, connect, remote, PC, ConnectID} -> PC
         after 1000 ->
-                exit(remote_peer_did_not_notify_owner)
+                exit(remote_peer_did_not_notify_worker)
         end,
     {ok, LocalChannel1}  = maps:find(0, LocalChannels),
     {ok, RemoteChannel1} = maps:find(0, RemoteChannels),
@@ -278,22 +278,22 @@ unreliable_messages_test(_Config) ->
     receive
         {enet, 0, #unreliable{ data = <<"local->remote 1">> }} -> ok
     after 500 ->
-            exit(remote_channel_did_not_send_data_to_owner)
+            exit(remote_channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unreliable{ data = <<"remote->local 1">> }} -> ok
     after 500 ->
-            exit(local_channel_did_not_send_data_to_owner)
+            exit(local_channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unreliable{ data = <<"local->remote 2">> }} -> ok
     after 500 ->
-            exit(remote_channel_did_not_send_data_to_owner)
+            exit(remote_channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unreliable{ data = <<"remote->local 2">> }} -> ok
     after 500 ->
-            exit(local_channel_did_not_send_data_to_owner)
+            exit(local_channel_did_not_send_data_to_worker)
     end,
     ok = enet:stop_host(LocalHost),
     ok = enet:stop_host(RemoteHost).
@@ -308,13 +308,13 @@ reliable_messages_test(_Config) ->
         receive
             {enet, connect, local, {LocalPeer, LCs}, C} -> {C, LCs}
         after 1000 ->
-                exit(local_peer_did_not_notify_owner)
+                exit(local_peer_did_not_notify_worker)
         end,
     {_RemotePeer, RemoteChannels} =
         receive
             {enet, connect, remote, PC, ConnectID} -> PC
         after 1000 ->
-                exit(remote_peer_did_not_notify_owner)
+                exit(remote_peer_did_not_notify_worker)
         end,
     {ok, LocalChannel1}  = maps:find(0, LocalChannels),
     {ok, RemoteChannel1} = maps:find(0, RemoteChannels),
@@ -325,22 +325,22 @@ reliable_messages_test(_Config) ->
     receive
         {enet, 0, #reliable{ data = <<"local->remote 1">> }} -> ok
     after 500 ->
-            exit(remote_channel_did_not_send_data_to_owner)
+            exit(remote_channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #reliable{ data = <<"remote->local 1">> }} -> ok
     after 500 ->
-            exit(local_channel_did_not_send_data_to_owner)
+            exit(local_channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #reliable{ data = <<"local->remote 2">> }} -> ok
     after 500 ->
-            exit(remote_channel_did_not_send_data_to_owner)
+            exit(remote_channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #reliable{ data = <<"remote->local 2">> }} -> ok
     after 500 ->
-            exit(local_channel_did_not_send_data_to_owner)
+            exit(local_channel_did_not_send_data_to_worker)
     end,
     ok = enet:stop_host(LocalHost),
     ok = enet:stop_host(RemoteHost).
@@ -356,36 +356,36 @@ unsequenced_broadcast_test(_Config) ->
         receive
             {enet, connect, local, {Peer12, _Cs12}, CID12} -> CID12
         after 1000 ->
-                exit(peer12_did_not_notify_owner)
+                exit(peer12_did_not_notify_worker)
         end,
     receive
         {enet, connect, remote, {_P21, _Cs21}, ConnectID12} -> ok
     after 1000 ->
-            exit(peer21_did_not_notify_owner)
+            exit(peer21_did_not_notify_worker)
     end,
     {ok, Peer23} = enet:connect_peer(Host2, "127.0.0.1", Host3, 1),
     ConnectID23 =
         receive
             {enet, connect, local, {Peer23, _Cs23}, CID23} -> CID23
         after 1000 ->
-                exit(peer23_did_not_notify_owner)
+                exit(peer23_did_not_notify_worker)
         end,
     receive
         {enet, connect, remote, {_P32, _Cs32}, ConnectID23} -> ok
     after 1000 ->
-            exit(peer32_did_not_notify_owner)
+            exit(peer32_did_not_notify_worker)
     end,
     {ok, Peer31} = enet:connect_peer(Host3, "127.0.0.1", Host1, 1),
     ConnectID31 =
         receive
             {enet, connect, local, {Peer31, _Cs31}, CID31} -> CID31
         after 1000 ->
-                exit(peer31_did_not_notify_owner)
+                exit(peer31_did_not_notify_worker)
         end,
     receive
         {enet, connect, remote, {_P13, _Cs13}, ConnectID31} -> ok
     after 1000 ->
-            exit(peer13_did_not_notify_owner)
+            exit(peer13_did_not_notify_worker)
     end,
     ok = enet:broadcast_unsequenced(Host1, 0, <<"host1->broadcast">>),
     ok = enet:broadcast_unsequenced(Host2, 0, <<"host2->broadcast">>),
@@ -393,32 +393,32 @@ unsequenced_broadcast_test(_Config) ->
     receive
         {enet, 0, #unsequenced{ data = <<"host1->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unsequenced{ data = <<"host1->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unsequenced{ data = <<"host2->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unsequenced{ data = <<"host2->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unsequenced{ data = <<"host3->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unsequenced{ data = <<"host3->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     ok = enet:stop_host(Host1),
     ok = enet:stop_host(Host2),
@@ -435,36 +435,36 @@ unreliable_broadcast_test(_Config) ->
         receive
             {enet, connect, local, {Peer12, _Cs12}, CID12} -> CID12
         after 1000 ->
-                exit(peer12_did_not_notify_owner)
+                exit(peer12_did_not_notify_worker)
         end,
     receive
         {enet, connect, remote, {_P21, _Cs21}, ConnectID12} -> ok
     after 1000 ->
-            exit(peer21_did_not_notify_owner)
+            exit(peer21_did_not_notify_worker)
     end,
     {ok, Peer23} = enet:connect_peer(Host2, "127.0.0.1", Host3, 1),
     ConnectID23 =
         receive
             {enet, connect, local, {Peer23, _Cs23}, CID23} -> CID23
         after 1000 ->
-                exit(peer23_did_not_notify_owner)
+                exit(peer23_did_not_notify_worker)
         end,
     receive
         {enet, connect, remote, {_P32, _Cs32}, ConnectID23} -> ok
     after 1000 ->
-            exit(peer32_did_not_notify_owner)
+            exit(peer32_did_not_notify_worker)
     end,
     {ok, Peer31} = enet:connect_peer(Host3, "127.0.0.1", Host1, 1),
     ConnectID31 =
         receive
             {enet, connect, local, {Peer31, _Cs31}, CID31} -> CID31
         after 1000 ->
-                exit(peer31_did_not_notify_owner)
+                exit(peer31_did_not_notify_worker)
         end,
     receive
         {enet, connect, remote, {_P13, _Cs13}, ConnectID31} -> ok
     after 1000 ->
-            exit(peer13_did_not_notify_owner)
+            exit(peer13_did_not_notify_worker)
     end,
     ok = enet:broadcast_unreliable(Host1, 0, <<"host1->broadcast">>),
     ok = enet:broadcast_unreliable(Host2, 0, <<"host2->broadcast">>),
@@ -472,32 +472,32 @@ unreliable_broadcast_test(_Config) ->
     receive
         {enet, 0, #unreliable{ data = <<"host1->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unreliable{ data = <<"host1->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unreliable{ data = <<"host2->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unreliable{ data = <<"host2->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unreliable{ data = <<"host3->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #unreliable{ data = <<"host3->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     ok = enet:stop_host(Host1),
     ok = enet:stop_host(Host2),
@@ -514,36 +514,36 @@ reliable_broadcast_test(_Config) ->
         receive
             {enet, connect, local, {Peer12, _Cs12}, CID12} -> CID12
         after 1000 ->
-                exit(peer12_did_not_notify_owner)
+                exit(peer12_did_not_notify_worker)
         end,
     receive
         {enet, connect, remote, {_P21, _Cs21}, ConnectID12} -> ok
     after 1000 ->
-            exit(peer21_did_not_notify_owner)
+            exit(peer21_did_not_notify_worker)
     end,
     {ok, Peer23} = enet:connect_peer(Host2, "127.0.0.1", Host3, 1),
     ConnectID23 =
         receive
             {enet, connect, local, {Peer23, _Cs23}, CID23} -> CID23
         after 1000 ->
-                exit(peer23_did_not_notify_owner)
+                exit(peer23_did_not_notify_worker)
         end,
     receive
         {enet, connect, remote, {_P32, _Cs32}, ConnectID23} -> ok
     after 1000 ->
-            exit(peer32_did_not_notify_owner)
+            exit(peer32_did_not_notify_worker)
     end,
     {ok, Peer31} = enet:connect_peer(Host3, "127.0.0.1", Host1, 1),
     ConnectID31 =
         receive
             {enet, connect, local, {Peer31, _Cs31}, CID31} -> CID31
         after 1000 ->
-                exit(peer31_did_not_notify_owner)
+                exit(peer31_did_not_notify_worker)
         end,
     receive
         {enet, connect, remote, {_P13, _Cs13}, ConnectID31} -> ok
     after 1000 ->
-            exit(peer13_did_not_notify_owner)
+            exit(peer13_did_not_notify_worker)
     end,
     ok = enet:broadcast_reliable(Host1, 0, <<"host1->broadcast">>),
     ok = enet:broadcast_reliable(Host2, 0, <<"host2->broadcast">>),
@@ -551,32 +551,32 @@ reliable_broadcast_test(_Config) ->
     receive
         {enet, 0, #reliable{ data = <<"host1->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #reliable{ data = <<"host1->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #reliable{ data = <<"host2->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #reliable{ data = <<"host2->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #reliable{ data = <<"host3->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     receive
         {enet, 0, #reliable{ data = <<"host3->broadcast">> }} -> ok
     after 500 ->
-            exit(channel_did_not_send_data_to_owner)
+            exit(channel_did_not_send_data_to_worker)
     end,
     ok = enet:stop_host(Host1),
     ok = enet:stop_host(Host2),

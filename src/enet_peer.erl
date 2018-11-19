@@ -40,7 +40,7 @@
 
 -record(state,
         {
-         owner,
+         worker,
          host,
          channels,
          local_port,
@@ -175,11 +175,11 @@ init([LocalPort, P = #enet_peer{ handshake_flow = local }]) ->
     case start_worker(ConnectFun, #{ip => IP, port => Port}) of
         {error, Reason} ->
             {stop, {worker_init_error, Reason}};
-        {ok, Owner} ->
-            _Ref = monitor(process, Owner),
-            Channels = start_channels(N, Owner),
+        {ok, Worker} ->
+            _Ref = monitor(process, Worker),
+            Channels = start_channels(N, Worker),
             S = #state{
-                   owner = Owner,
+                   worker = Worker,
                    channels = Channels,
                    host = Host,
                    local_port = LocalPort,
@@ -212,10 +212,10 @@ init([LocalPort, P = #enet_peer{ handshake_flow = remote }]) ->
     case start_worker(ConnectFun, #{ip => IP, port => Port}) of
         {error, Reason} ->
             {error, {worker_init_error, Reason}};
-        {ok, Owner} ->
-            _Ref = monitor(process, Owner),
+        {ok, Worker} ->
+            _Ref = monitor(process, Worker),
             S = #state{
-                   owner = Owner,
+                   worker = Worker,
                    host = Host,
                    local_port = LocalPort,
                    ip = IP,
@@ -338,7 +338,7 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
        data                         = _Data
       } = C,
     #state{
-       owner = Owner,
+       worker = Worker,
        host = Host,
        ip = IP,
        port = Port,
@@ -364,7 +364,7 @@ acknowledging_connect(cast, {incoming_command, {_H, C = #connect{}}}, S) ->
     Data = [HBin, CBin],
     {sent_time, SentTime} =
         enet_host:send_outgoing_commands(Host, Data, IP, Port, RemotePeerID),
-    Channels = start_channels(ChannelCount, Owner),
+    Channels = start_channels(ChannelCount, Worker),
     ChannelID = 16#FF,
     VerifyConnectTimeout =
         make_resend_timer(
@@ -405,7 +405,7 @@ acknowledging_verify_connect(
     %%
     %% - Verify that the data is correct
     %% - Add the remote peer ID to the Peer Table
-    %% - Notify owner that we are connected
+    %% - Notify worker that we are connected
     %% - Change state to 'connected'
     %%
     #verify_connect{
@@ -430,7 +430,7 @@ acknowledging_verify_connect(
     LocalMTU = get_mtu(self()),
     case S of
         #state{
-           owner                        = Owner,
+           worker                        = Worker,
            %% ---
            %% Fields below are matched against the values received in
            %% the Verify Connect command.
@@ -446,7 +446,7 @@ acknowledging_verify_connect(
           } when
               LocalChannelCount =:= RemoteChannelCount,
               LocalMTU =:= RemoteMTU ->
-            Owner ! {enet, connect, local, {self(), Channels}, ConnectID},
+            Worker ! {enet, connect, local, {self(), Channels}, ConnectID},
             NewS = S#state{ remote_peer_id = RemotePeerID },
             {next_state, connected, NewS};
         _Mismatch ->
@@ -469,15 +469,15 @@ verifying_connect(cast, {incoming_command, {H, C = #acknowledge{}}}, S) ->
     %% Received an Acknowledge command in the 'verifying_connect' state.
     %%
     %% - Verify that the acknowledge is correct
-    %% - Notify owner that a new peer has been connected
+    %% - Notify worker that a new peer has been connected
     %% - Change to 'connected' state
     %%
     #state{
-       owner = Owner,
+       worker = Worker,
        channels = Channels,
        connect_id = ConnectID
       } = S,
-    Owner ! {enet, connect, remote, {self(), Channels}, ConnectID},
+    Worker ! {enet, connect, remote, {self(), Channels}, ConnectID},
     #command_header{ channel_id = ChannelID } = H,
     #acknowledge{
        received_reliable_sequence_number = SequenceNumber,
@@ -628,11 +628,11 @@ connected(cast, {incoming_command, {_H, #disconnect{}}}, S) ->
     %%
     %% Received Disconnect command.
     %%
-    %% - Notify owner application
+    %% - Notify worker application
     %% - Stop
     %%
     #state{
-       owner = Owner,
+       worker = Worker,
        local_port = LocalPort,
        ip = IP,
        port = Port,
@@ -640,7 +640,7 @@ connected(cast, {incoming_command, {_H, #disconnect{}}}, S) ->
        connect_id = ConnectID
       } = S,
     ok = enet_disconnector:unset_trigger(LocalPort, RemotePeerID, IP, Port),
-    Owner ! {enet, disconnected, remote, self(), ConnectID},
+    Worker ! {enet, disconnected, remote, self(), ConnectID},
     {stop, normal, S};
 
 connected(cast, {outgoing_command, {H, C = #unsequenced{}}}, S) ->
@@ -822,14 +822,14 @@ disconnecting(cast, {incoming_command, {_H, _C = #acknowledge{}}}, S) ->
     %% Received an Acknowledge command in the 'disconnecting' state.
     %%
     %% - Verify that the acknowledge is correct
-    %% - Notify owner application
+    %% - Notify worker application
     %% - Stop
     %%
     #state{
-       owner = Owner,
+       worker = Worker,
        connect_id = ConnectID
       } = S,
-    Owner ! {enet, disconnected, local, self(), ConnectID},
+    Worker ! {enet, disconnected, local, self(), ConnectID},
     {stop, normal, S};
 
 disconnecting(cast, {incoming_command, {_H, _C}}, S) ->
@@ -909,16 +909,16 @@ handle_event({call, From}, {channel, ID}, S) ->
     #state{ channels = #{ ID := Channel }} = S,
     {keep_state, S, [{reply, From, Channel}]};
 
-handle_event(info, {'DOWN', _, process, O, _Reason}, S = #state{ owner = O }) ->
-    {stop, owner_process_down, S}.
+handle_event(info, {'DOWN', _, process, O, _}, S = #state{ worker = O }) ->
+    {stop, worker_process_down, S}.
 
 
-start_channels(N, Owner) ->
+start_channels(N, Worker) ->
     IDs = lists:seq(0, N-1),
     Channels =
         lists:map(
           fun (ID) ->
-                  {ok, Channel} = enet_channel:start_link(ID, self(), Owner),
+                  {ok, Channel} = enet_channel:start_link(ID, self(), Worker),
                   {ID, Channel}
           end,
           IDs),

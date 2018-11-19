@@ -28,7 +28,7 @@
         {
           id,
           peer,
-          owner,
+          worker,
           incoming_reliable_sequence_number = 1,
           incoming_unreliable_sequence_number = 0,
           outgoing_reliable_sequence_number = 1,
@@ -44,39 +44,39 @@
 %%% API
 %%%
 
-start_link(ID, Peer, Owner) ->
-    proc_lib:start_link(?MODULE, init, [ID, Peer, Owner, self()]).
+start_link(ID, Peer, Worker) ->
+    proc_lib:start_link(?MODULE, init, [ID, Peer, Worker, self()]).
 
 stop(Channel) ->
     Channel ! stop.
 
 recv_unsequenced(Channel, {H, C}) ->
-    %% Peer -> Channel -> Owner
+    %% Peer -> Channel -> Worker
     Channel ! {recv_unsequenced, {H, C}},
     ok.
 
 send_unsequenced(Channel, Data) ->
-    %% Owner -> Channel -> Peer
+    %% Worker -> Channel -> Peer
     Channel ! {send_unsequenced, Data},
     ok.
 
 recv_unreliable(Channel, {H, C}) ->
-    %% Peer -> Channel -> Owner
+    %% Peer -> Channel -> Worker
     Channel ! {recv_unreliable, {H, C}},
     ok.
 
 send_unreliable(Channel, Data) ->
-    %% Owner -> Channel -> Peer
+    %% Worker -> Channel -> Peer
     Channel ! {send_unreliable, Data},
     ok.
 
 recv_reliable(Channel, {H, C}) ->
-    %% Peer -> Channel -> Owner
+    %% Peer -> Channel -> Worker
     Channel ! {recv_reliable, {H, C}},
     ok.
 
 send_reliable(Channel, Data) ->
-    %% Owner -> Channel -> Peer
+    %% Worker -> Channel -> Peer
     Channel ! {send_reliable, Data},
     ok.
 
@@ -85,12 +85,12 @@ send_reliable(Channel, Data) ->
 %%% Implementation
 %%%
 
-init(ID, Peer, Owner, Parent) ->
+init(ID, Peer, Worker, Parent) ->
     Debug = sys:debug_options([]),
     State = #state{
                id = ID,
                peer = Peer,
-               owner = Owner,
+               worker = Worker,
                sys_parent = Parent,
                sys_debug = Debug
               },
@@ -98,7 +98,7 @@ init(ID, Peer, Owner, Parent) ->
     loop(State).
 
 
-loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
+loop(S = #state{ id = ID, peer = Peer, worker = Worker }) ->
     receive
 
         {system, From, Request} ->
@@ -109,7 +109,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
            #command_header{ unsequenced = 1 },
            C = #unsequenced{}
           }} ->
-            Owner ! {enet, ID, C},
+            Worker ! {enet, ID, C},
             loop(S);
         {send_unsequenced, Data} ->
             {H, C} = enet_command:send_unsequenced(ID, Data),
@@ -124,7 +124,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
                     %% Data is old - drop it and continue.
                     loop(S);
                true ->
-                    Owner ! {enet, ID, C},
+                    Worker ! {enet, ID, C},
                     NewS = S#state{ incoming_unreliable_sequence_number = N },
                     loop(NewS)
             end;
@@ -139,7 +139,7 @@ loop(S = #state{ id = ID, peer = Peer, owner = Owner }) ->
            #command_header{ reliable_sequence_number = N },
            C = #reliable{}
           }} when N =:= S#state.incoming_reliable_sequence_number ->
-            Owner ! {enet, ID, C},
+            Worker ! {enet, ID, C},
             NewS = S#state{ incoming_reliable_sequence_number = N + 1 },
             loop(NewS);
         {send_reliable, Data} ->
