@@ -130,3 +130,70 @@ broadcast_reliable(HostPort, ChannelID, Data) -> ok
     Data = iolist()
 ```
 Broadcast *reliable* data to all peers connected to `HostPort` on `ChannelID`.
+
+## Examples
+### Creating an ENet server
+```erlang
+ListeningPort = 1234,
+ConnectFun = fun(PeerInfo) ->
+                     server_supervisor:start_worker(PeerInfo)
+             end,
+Options = [{peer_limit, 8}, {channel_limit, 3}],
+{ok, Host} = enet:start_host(ListeningPort, ConnectFun, Options),
+...
+...
+...
+enet:stop_host(Host).
+```
+### Creating an ENet client and connecting to a server
+```erlang
+ListeningPort = 0, %% Port will be dynamically assigned
+ConnectFun = fun(PeerInfo) ->
+                     client_supervisor:start_worker(PeerInfo)
+             end,
+Options = [{peer_limit, 1}, {channel_limit, 3}],
+{ok, Host} = enet:start_host(ListeningPort, ConnectFun, Options),
+...
+...
+RemoteHost = "...."
+Port = 1234,
+ChannelCount = 3
+{ok, Peer} = enet:connect_peer(Host, RemoteHost, Port, ChannelCount),
+...
+...
+enet:stop_host(Host).
+```
+### Sending packets to an ENet peer
+```erlang
+worker_loop(PeerInfo = #{channels := Channels}, State) ->
+    ...
+    ...
+    {ok, Channel0} = maps:find(0, Channels),
+    Data = <<"packet">>,
+    enet:send_unsequenced(Channel0, Data),
+    enet:send_unreliable(Channel0, Data),
+    enet:send_reliable(Channel0, Data),
+    ...
+    ...
+    worker_loop(PeerInfo, State).
+```
+### Receiving packets from an ENet peer
+```erlang
+worker_loop(PeerInfo, State) ->
+    ...
+    ...
+    receive
+        {enet, ChannelID, #unsequenced{ data = Packet }} ->
+            %% Handle the Packet
+            ok;
+        {enet, ChannelID, #unreliable{ data = Packet }} ->
+            %% Handle the Packet
+            ok;
+        {enet, ChannelID, #reliable{ data = Packet }} ->
+            %% Handle the Packet
+            ok
+    end,
+    ...
+    ...
+    worker_loop(PeerInfo, State).
+```
