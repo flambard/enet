@@ -76,19 +76,19 @@ disconnect_peer_now(Peer) ->
     enet_peer:disconnect_now(Peer).
 
 
--spec send_unsequenced(Channel :: pid(), Data :: iolist()) -> ok.
+-spec send_unsequenced(Channel :: pid(), Data :: iodata()) -> ok.
 
 send_unsequenced(Channel, Data) ->
     enet_channel:send_unsequenced(Channel, Data).
 
 
--spec send_unreliable(Channel :: pid(), Data :: iolist()) -> ok.
+-spec send_unreliable(Channel :: pid(), Data :: iodata()) -> ok.
 
 send_unreliable(Channel, Data) ->
     enet_channel:send_unreliable(Channel, Data).
 
 
--spec send_reliable(Channel :: pid(), Data :: iolist()) -> ok.
+-spec send_reliable(Channel :: pid(), Data :: iodata()) -> ok.
 
 send_reliable(Channel, Data) ->
     enet_channel:send_reliable(Channel, Data).
@@ -96,7 +96,7 @@ send_reliable(Channel, Data) ->
 
 -spec broadcast_unsequenced(HostPort :: port_number(),
                             ChannelID :: integer(),
-                            Data :: iolist()) -> ok.
+                            Data :: iodata()) -> ok.
 
 broadcast_unsequenced(HostPort, ChannelID, Data) ->
     broadcast(HostPort, ChannelID, Data, fun send_unsequenced/2).
@@ -104,7 +104,7 @@ broadcast_unsequenced(HostPort, ChannelID, Data) ->
 
 -spec broadcast_unreliable(HostPort :: port_number(),
                            ChannelID :: integer(),
-                           Data :: iolist()) -> ok.
+                           Data :: iodata()) -> ok.
 
 broadcast_unreliable(HostPort, ChannelID, Data) ->
     broadcast(HostPort, ChannelID, Data, fun send_unreliable/2).
@@ -112,7 +112,7 @@ broadcast_unreliable(HostPort, ChannelID, Data) ->
 
 -spec broadcast_reliable(HostPort :: port_number(),
                          ChannelID :: integer(),
-                         Data :: iolist()) -> ok.
+                         Data :: iodata()) -> ok.
 
 broadcast_reliable(HostPort, ChannelID, Data) ->
     broadcast(HostPort, ChannelID, Data, fun send_reliable/2).

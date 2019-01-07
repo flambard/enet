@@ -79,7 +79,7 @@ Disconnect `Peer` immediately without waiting for an ACK from the remote peer.
 send_unsequenced(Channel, Data) -> ok
 
     Channel = pid()
-    Data = iolist()
+    Data = iodata()
 ```
 Send *unsequenced* data to the remote peer over `Channel`.
 
@@ -88,7 +88,7 @@ Send *unsequenced* data to the remote peer over `Channel`.
 send_unreliable(Channel, Data) -> ok
 
     Channel = pid()
-    Data = iolist()
+    Data = iodata()
 ```
 Send *unreliable* data to the remote peer over `Channel`.
 
@@ -97,7 +97,7 @@ Send *unreliable* data to the remote peer over `Channel`.
 send_reliable(Channel, Data) -> ok
 
     Channel = pid()
-    Data = iolist()
+    Data = iodata()
 ```
 Send *reliable* data to the remote peer over `Channel`.
 
@@ -107,7 +107,7 @@ broadcast_unsequenced(HostPort, ChannelID, Data) -> ok
 
     HostPort = port_number()
     ChannelID = integer()
-    Data = iolist()
+    Data = iodata()
 ```
 Broadcast *unsequenced* data to all peers connected to `HostPort` on `ChannelID`.
 
@@ -117,7 +117,7 @@ broadcast_unreliable(HostPort, ChannelID, Data) -> ok
 
     HostPort = port_number()
     ChannelID = integer()
-    Data = iolist()
+    Data = iodata()
 ```
 Broadcast *unreliable* data to all peers connected to `HostPort` on `ChannelID`.
 
@@ -127,7 +127,7 @@ broadcast_reliable(HostPort, ChannelID, Data) -> ok
 
     HostPort = port_number()
     ChannelID = integer()
-    Data = iolist()
+    Data = iodata()
 ```
 Broadcast *reliable* data to all peers connected to `HostPort` on `ChannelID`.
 
