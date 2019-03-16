@@ -49,7 +49,7 @@ start_link(Port, ConnectFun, Options) ->
     gen_server:start_link(?MODULE, {Port, ConnectFun, Options}, []).
 
 socket_options() ->
-    [binary, {active, false}, {reuseaddr, true}, {broadcast, true}].
+    [binary, {active, false}, {reuseaddr, false}, {broadcast, true}].
 
 give_socket(Host, Socket) ->
     ok = gen_udp:controlling_process(Socket, Host),
