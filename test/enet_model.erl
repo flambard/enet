@@ -54,13 +54,13 @@ initial_state() ->
 %%%
 
 command(#state{ hosts = [] }) ->
-    {call, enet, start_host, [0, connect_fun(), host_options()]};
+    {call, enet_sync, start_host, [connect_fun(), host_options()]};
 
 command(S) ->
     Peers = [P || H <- S#state.hosts, P <- H#host.peers],
     oneof(
       [
-       {call, enet, start_host, [0, connect_fun(), host_options()]},
+       {call, enet_sync, start_host, [connect_fun(), host_options()]},
 
        ?LET(#host{ port = Port }, started_host(S),
             {call, enet_sync, stop_host, [Port]}),
@@ -119,8 +119,8 @@ precondition(_S, {call, _, _, _}) ->
 %%% State transitions
 %%%
 
-next_state(S, V, {call, _, start_host, [_Port, _ConnectFun, Options]}) ->
-    HostPort = {call, erlang, element, [2, V]},
+next_state(S, V, {call, enet_sync, start_host, [_ConnectFun, Options]}) ->
+    HostPort = {call, enet_sync, get_host_port, [V]},
     {peer_limit, PeerLimit} = lists:keyfind(peer_limit, 1, Options),
     {channel_limit, ChannelLimit} = lists:keyfind(channel_limit, 1, Options),
     Host = #host{
@@ -163,10 +163,10 @@ next_state(S, V, {call, enet_sync, connect, [LPort, RPort, ChannelCount]}) ->
             S;
         {H1, H1 = #host{ peer_count = C }} ->
             %% Trying to connect to own host
-            PeerPid = {call, erlang, element, [1, V]},
-            Channels = {call, erlang, element, [2, V]},
-            RemotePeerPid = {call, erlang, element, [3, V]},
-            RemoteChannels = {call, erlang, element, [4, V]},
+            PeerPid = {call, enet_sync, get_local_peer_pid, [V]},
+            Channels = {call, enet_sync, get_local_channels, [V]},
+            RemotePeerPid = {call, enet_sync, get_remote_peer_pid, [V]},
+            RemoteChannels = {call, enet_sync, get_remote_channels, [V]},
             ConnectID = {call, enet_peer, get_connect_id, [PeerPid]},
             Peer1 = #peer{
                        connect_id = ConnectID,
@@ -189,10 +189,10 @@ next_state(S, V, {call, enet_sync, connect, [LPort, RPort, ChannelCount]}) ->
               hosts = Hosts1
              };
         {H1, H2 = #host{}} ->
-            PeerPid = {call, erlang, element, [1, V]},
-            Channels = {call, erlang, element, [2, V]},
-            RemotePeerPid = {call, erlang, element, [3, V]},
-            RemoteChannels = {call, erlang, element, [4, V]},
+            PeerPid = {call, enet_sync, get_local_peer_pid, [V]},
+            Channels = {call, enet_sync, get_local_channels, [V]},
+            RemotePeerPid = {call, enet_sync, get_remote_peer_pid, [V]},
+            RemoteChannels = {call, enet_sync, get_remote_channels, [V]},
             ConnectID = {call, enet_peer, get_connect_id, [PeerPid]},
             Peer1 = #peer{
                        connect_id = ConnectID,
@@ -252,7 +252,7 @@ next_state(S, _V, {call, _, send_reliable, [_ChannelPid, _Data]}) ->
 %%% Post-conditions
 %%%
 
-postcondition(_S, {call, _, start_host, [_P, _ConnectFun, _Options]}, Res) ->
+postcondition(_S, {call, enet_sync, start_host, [_ConnectFun, _Opts]}, Res) ->
     case Res of
         {error, _Reason} -> false;
         {ok, _Port}      -> true
@@ -387,8 +387,7 @@ channel_pid(#state{ hosts = Hosts }) ->
                    Peers =/= []),
          ?LET(#peer{ channels = Channels, channel_count = Count }, oneof(Peers),
               ?LET(ID, integer(0, Count - 1),
-                   {call, erlang, element,
-                    [2, {call, maps, find, [ID, Channels]}]}))).
+                   {call, enet_sync, get_channel, [ID, Channels]}))).
 
 
 channel_count(Limit) ->

@@ -3,14 +3,23 @@
 -include_lib("enet/include/enet.hrl").
 
 -export([
+         start_host/2,
          connect/3,
          disconnect/2,
          stop_host/1,
          send_unsequenced/2,
          send_unreliable/2,
-         send_reliable/2
+         send_reliable/2,
+         get_host_port/1,
+         get_local_peer_pid/1,
+         get_local_channels/1,
+         get_remote_peer_pid/1,
+         get_remote_channels/1,
+         get_channel/2
         ]).
 
+start_host(ConnectFun, Options) ->
+    enet:start_host(0, ConnectFun, Options).
 
 connect(LocalHost, RemotePort, ChannelCount) ->
     case enet:connect_peer(LocalHost, "127.0.0.1", RemotePort, ChannelCount) of
@@ -119,3 +128,28 @@ gproc_pool_key(Pid) ->
     Name = enet_peer:get_name(Pid),
     PeerID = enet_peer:get_peer_id(Pid),
     {n, l, [gproc_pool, PeerID, Name]}.
+
+
+
+%%%
+%%% Helpers
+%%%
+
+get_host_port(V) ->
+    element(2, V).
+
+get_local_peer_pid(V) ->
+    element(1, V).
+
+get_local_channels(V) ->
+    element(2, V).
+
+get_remote_peer_pid(V) ->
+    element(3, V).
+
+get_remote_channels(V) ->
+    element(4, V).
+
+get_channel(ID, Channels) ->
+    {ok, Channel} = maps:find(ID, Channels),
+    Channel.
