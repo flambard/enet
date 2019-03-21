@@ -9,7 +9,8 @@
          remove_peer/2,
          connect_peer/2,
          disconnect_peer/2,
-         active_peers/1
+         active_peers/1,
+         worker_id/2
         ]).
 
 %% gen_server callbacks
@@ -51,6 +52,9 @@ disconnect_peer(Port, Name) ->
 
 active_peers(Port) ->
     gproc_pool:active_workers(Port).
+
+worker_id(Port, Name) ->
+    gproc_pool:worker_id(Port, Name).
 
 
 %%%===================================================================

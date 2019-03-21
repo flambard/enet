@@ -34,7 +34,7 @@ connect(LocalHost, RemotePort, ChannelCount) ->
                             {error, remote_timeout}
                     end
             after 1000 ->
-                    Key = gproc_pool_key(LPeer),
+                    Key = enet_peer:get_pool_worker_id(LPeer),
                     R = gproc:monitor(Key),
                     exit(LPeer, normal),
                     receive
@@ -44,8 +44,8 @@ connect(LocalHost, RemotePort, ChannelCount) ->
     end.
 
 disconnect(LPid, RPid) ->
-    LKey = gproc_pool_key(LPid),
-    RKey = gproc_pool_key(RPid),
+    LKey = enet_peer:get_pool_worker_id(LPid),
+    RKey = enet_peer:get_pool_worker_id(RPid),
     LRef = gproc:monitor(LKey),
     RRef = gproc:monitor(RKey),
     ok = enet:disconnect_peer(LPid),
@@ -75,7 +75,7 @@ stop_host(Port) ->
     RemoteConnectedPeers =
         gproc:select([{{{p, l, remote_host_port}, '$1', Port}, [], ['$1']}]),
     PeerMonitors = lists:map(fun (Peer) ->
-                                     Key = gproc_pool_key(Peer),
+                                     Key = enet_peer:get_pool_worker_id(Peer),
                                      R = gproc:monitor(Key),
                                      {Peer, R, Key}
                              end,
@@ -122,13 +122,6 @@ send_reliable(Channel, Data) ->
     after 1000 ->
             {error, data_not_received}
     end.
-
-
-gproc_pool_key(Pid) ->
-    Name = enet_peer:get_name(Pid),
-    PeerID = enet_peer:get_peer_id(Pid),
-    {n, l, [gproc_pool, PeerID, Name]}.
-
 
 
 %%%
