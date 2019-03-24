@@ -18,6 +18,7 @@
          get_mtu/1,
          get_name/1,
          get_peer_id/1,
+         get_pool/1,
          get_pool_worker_id/1
         ]).
 
@@ -149,6 +150,9 @@ get_name(Peer) ->
 
 get_peer_id(Peer) ->
     gproc:get_value({p, l, peer_id}, Peer).
+
+get_pool(Peer) ->
+    gen_statem:call(Peer, pool).
 
 get_pool_worker_id(Peer) ->
     gen_statem:call(Peer, pool_worker_id).
@@ -908,6 +912,9 @@ handle_event(cast, {incoming_packet, FromIP, SentTime, Packet}, S) ->
 
 handle_event({call, From}, channels, S) ->
     {keep_state, S, [{reply, From, S#state.channels}]};
+
+handle_event({call, From}, pool, S) ->
+    {keep_state, S, [{reply, From, S#state.local_port}]};
 
 handle_event({call, From}, pool_worker_id, S) ->
     WorkerID = enet_pool:worker_id(S#state.local_port, get_name(self())),

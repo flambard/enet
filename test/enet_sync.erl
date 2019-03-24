@@ -4,6 +4,8 @@
 
 -export([
          start_host/2,
+         connect_from_full_host/3,
+         connect_to_full_host/3,
          connect/3,
          disconnect/2,
          stop_host/1,
@@ -21,6 +23,12 @@
 start_host(ConnectFun, Options) ->
     enet:start_host(0, ConnectFun, Options).
 
+connect_from_full_host(LocalHost, RemotePort, ChannelCount) ->
+    connect(LocalHost, RemotePort, ChannelCount).
+
+connect_to_full_host(LocalHost, RemotePort, ChannelCount) ->
+    connect(LocalHost, RemotePort, ChannelCount).
+
 connect(LocalHost, RemotePort, ChannelCount) ->
     case enet:connect_peer(LocalHost, "127.0.0.1", RemotePort, ChannelCount) of
         {error, reached_peer_limit} -> {error, reached_peer_limit};
@@ -33,41 +41,30 @@ connect(LocalHost, RemotePort, ChannelCount) ->
                     after 1000 ->
                             {error, remote_timeout}
                     end
-            after 1000 ->
-                    Key = enet_peer:get_pool_worker_id(LPeer),
-                    R = gproc:monitor(Key),
-                    exit(LPeer, normal),
-                    receive
-                        {gproc, unreg, R, Key} -> {error, local_timeout}
-                    end
+            after 2000 ->
+                    Pool = enet_peer:get_pool(LPeer),
+                    Name = enet_peer:get_name(LPeer),
+                    wait_until_worker_has_left_pool(Pool, Name),
+                    {error, local_timeout}
             end
     end.
 
 disconnect(LPid, RPid) ->
-    LKey = enet_peer:get_pool_worker_id(LPid),
-    RKey = enet_peer:get_pool_worker_id(RPid),
-    LRef = gproc:monitor(LKey),
-    RRef = gproc:monitor(RKey),
+    LPool = enet_peer:get_pool(LPid),
+    RPool = enet_peer:get_pool(RPid),
+    LName = enet_peer:get_name(LPid),
+    RName = enet_peer:get_name(RPid),
     ok = enet:disconnect_peer(LPid),
     receive
         {enet, disconnected, local, LPid, ConnectID} ->
             receive
                 {enet, disconnected, remote, RPid, ConnectID} ->
-                    receive
-                        {gproc, unreg, LRef, LKey} ->
-                            receive
-                                {gproc, unreg, RRef, RKey} ->
-                                    receive after 500 -> ok end
-                            after 1000 ->
-                                    {error, remote_timeout}
-                            end
-                    after 1000 ->
-                            {error, local_timeout}
-                    end
-            after 1000 ->
+                    wait_until_worker_has_left_pool(LPool, LName),
+                    wait_until_worker_has_left_pool(RPool, RName)
+            after 5000 ->
                     {error, remote_timeout}
             end
-    after 1000 ->
+    after 5000 ->
             {error, local_timeout}
     end.
 
@@ -127,6 +124,15 @@ send_reliable(Channel, Data) ->
 %%%
 %%% Helpers
 %%%
+
+wait_until_worker_has_left_pool(Pool, Name) ->
+    case lists:member(Name, [N || {N, _P} <- gproc_pool:worker_pool(Pool)]) of
+        false -> ok;
+        true ->
+            receive
+            after 200 -> wait_until_worker_has_left_pool(Pool, Name)
+            end
+    end.
 
 get_host_port(V) ->
     element(2, V).
