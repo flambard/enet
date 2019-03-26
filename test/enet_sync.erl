@@ -44,6 +44,7 @@ connect(LocalHost, RemotePort, ChannelCount) ->
             after 2000 ->
                     Pool = enet_peer:get_pool(LPeer),
                     Name = enet_peer:get_name(LPeer),
+                    exit(LPeer, normal),
                     wait_until_worker_has_left_pool(Pool, Name),
                     {error, local_timeout}
             end
@@ -72,9 +73,9 @@ stop_host(Port) ->
     RemoteConnectedPeers =
         gproc:select([{{{p, l, remote_host_port}, '$1', Port}, [], ['$1']}]),
     PeerMonitors = lists:map(fun (Peer) ->
-                                     Key = enet_peer:get_pool_worker_id(Peer),
-                                     R = gproc:monitor(Key),
-                                     {Peer, R, Key}
+                                     Pool = enet_peer:get_pool(Peer),
+                                     Name = enet_peer:get_name(Peer),
+                                     {Peer, Pool, Name}
                              end,
                              RemoteConnectedPeers),
     [Pid] = gproc:select([{{{p, l, port}, '$1', Port}, [], ['$1']}]),
@@ -82,11 +83,11 @@ stop_host(Port) ->
     ok = enet:stop_host(Port),
     receive
         {'DOWN', Ref, process, Pid, shutdown} ->
-            lists:foreach(fun ({Peer, R, Key}) ->
+            lists:foreach(fun({Peer, Pool, _Name}) when Pool =:= Port ->
+                                  exit(Peer, normal);
+                             ({Peer, Pool, Name}) ->
                                   exit(Peer, normal),
-                                  receive
-                                      {gproc, unreg, R, Key} -> ok
-                                  end
+                                  wait_until_worker_has_left_pool(Pool, Name)
                           end,
                           PeerMonitors)
     after 1000 ->
