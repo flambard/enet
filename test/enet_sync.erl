@@ -4,8 +4,9 @@
 
 -export([
          start_host/2,
-         connect_from_full_host/3,
-         connect_to_full_host/3,
+         connect_from_full_local_host/3,
+         connect_to_full_remote_host/3,
+         connect_to_self/3,
          connect/3,
          disconnect/2,
          stop_host/1,
@@ -23,10 +24,13 @@
 start_host(ConnectFun, Options) ->
     enet:start_host(0, ConnectFun, Options).
 
-connect_from_full_host(LocalHost, RemotePort, ChannelCount) ->
+connect_from_full_local_host(LocalHost, RemotePort, ChannelCount) ->
     connect(LocalHost, RemotePort, ChannelCount).
 
-connect_to_full_host(LocalHost, RemotePort, ChannelCount) ->
+connect_to_full_remote_host(LocalHost, RemotePort, ChannelCount) ->
+    connect(LocalHost, RemotePort, ChannelCount).
+
+connect_to_self(LocalHost, RemotePort, ChannelCount) ->
     connect(LocalHost, RemotePort, ChannelCount).
 
 connect(LocalHost, RemotePort, ChannelCount) ->
