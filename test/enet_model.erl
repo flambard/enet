@@ -325,6 +325,9 @@ postcondition(_S, {call, _, connect_to_full_remote_host, [_L, _R, _C]}, Res) ->
 
 postcondition(S, {call, _, connect_to_self, [Port, Port, _C]}, Res) ->
     case get_host_with_port(S, Port) of
+        #{ peer_limit := L, peer_count := L } ->
+            %% Tried to connect from a full host -> reached_peer_limit
+            Res =:= {error, reached_peer_limit};
         #{ peer_limit := L, peer_count := C } when L - C =:= 1 ->
             %% Tried to connect to own host without room for two new peers
             case Res of
